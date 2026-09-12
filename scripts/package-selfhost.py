@@ -12,7 +12,7 @@ root = Path(__file__).resolve().parents[1]
 trees = ['backend', 'db', 'src', 'public/covers', 'public/media', 'public/fonts',
          'public/visualizers', 'docs/upstream/yue2']
 files = '''LICENSE README.md SELF_HOSTED.md SECURITY.md THIRD_PARTY_NOTICES.md .env.example .gitignore
-package.json package-lock.json tsconfig.json vite.config.ts index.html visualizer-render.html'''.split()
+public/favicon.svg package.json package-lock.json tsconfig.json vite.config.ts index.html visualizer-render.html'''.split()
 files += [str(p.relative_to(root)) for p in (root/'deploy').iterdir() if p.is_file() and p.suffix in {'.py', '.json', '.in', '.yaml', '.apparmor'}]
 files += [str(p.relative_to(root)) for p in (root/'scripts').iterdir() if p.is_file() and (p.name.startswith(('verify-', 'test-')) or p.name in {'dev-connected.mjs', 'package-selfhost.py', 'capture-studio.mjs'})]
 files += ['scripts/video/'+name for name in '''visualizer-export-api.mjs visualizer-export-relay.mjs

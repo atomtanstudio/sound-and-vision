@@ -1,4 +1,4 @@
-# Sound/Vision self-hosted release candidate
+# Sound and Vision self-hosted release candidate
 
 This package contains the application source, lock files, sample assets and setup guides. It contains no user library, login credentials or model weights. Music video is marked **Coming soon** and disabled; music, kinetic lyric videos and visualizer videos remain available.
 

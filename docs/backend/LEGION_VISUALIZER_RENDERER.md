@@ -2,7 +2,7 @@
 
 The standalone service lives at `/srv/ai/sound-vision-renderer`, uses the existing Node runtime at `/srv/ai/sound-vision/bin/node`, and listens only on `127.0.0.1:5192`. Its user unit is `sound-vision-renderer.service`. It does not restart or reconfigure the music service. Jobs and finished videos persist under `data/renders/<id>` on Legion.
 
-The editor uses `SOUND_VISION_RENDER_BACKEND_URL=http://127.0.0.1:5192`. `scripts/dev-connected.mjs` maintains the additional SSH forward using the existing `SOUND_VISION_SSH_HOST`. Until that setting is enabled, the original Mac renderer remains selected. The relay authenticates server-side with the existing Sound/Vision service token, retains Mac download history, and fails visibly if Legion is unreachable; it never silently submits new jobs to the Mac.
+The editor uses `SOUND_VISION_RENDER_BACKEND_URL=http://127.0.0.1:5192`. `scripts/dev-connected.mjs` maintains the additional SSH forward using the existing `SOUND_VISION_SSH_HOST`. Until that setting is enabled, the original Mac renderer remains selected. The relay authenticates server-side with the existing Sound and Vision service token, retains Mac download history, and fails visibly if Legion is unreachable; it never silently submits new jobs to the Mac.
 
 Build the standalone composition with:
 

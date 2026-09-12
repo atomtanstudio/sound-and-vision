@@ -24,7 +24,7 @@ editor still exports an editing manifest rather than submitting this full render
    generated image defines chrome, black lacquer, smoked glass and scarlet light.
    Each H3 job receives the corresponding excerpt of the actual approved song.
 4. `scripts/video/run-film.py --plan PLAN.json --root /srv/ai/sound-vision`
-   submits each slot through Sound/Vision. It locks against duplicate runners,
+   submits each slot through Sound and Vision. It locks against duplicate runners,
    uses stable request IDs, records actual retry IDs in `job-map.json`, and
    persists progress in `batch-status.json`. Successful clips are reused.
 5. `scripts/video/render-kinetic-film.py` validates non-null, ordered acoustic

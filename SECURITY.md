@@ -1,6 +1,6 @@
 # Security and private installations
 
-Sound/Vision is a single-owner self-hosted application. The browser launcher binds to loopback and proxies authenticated requests to the music backend. It is not designed to be exposed directly as a public multi-user service.
+Sound and Vision is a single-owner self-hosted application. The browser launcher binds to loopback and proxies authenticated requests to the music backend. It is not designed to be exposed directly as a public multi-user service.
 
 Keep `service.token`, `service.env`, `providers.json`, `.env.local`, `.secrets/`, model/runtime folders and the OpenAI account directory private. The Git ignore rules exclude these locations, generated productions and operational delivery artifacts. Back them up separately; a source checkout does not contain your music library or login state.
 

@@ -1,4 +1,4 @@
-# Sound/Vision status
+# Sound and Vision status
 
 Updated 10 September 2026. The current interface uses the graphite/coral and soft-white/clay themes.
 
@@ -8,11 +8,11 @@ YuE2 is installed on Legion in an isolated Python environment, pinned to verifie
 
 Implemented: persistent request/take/job/artifact records, one/two versions, server validation, idempotent submissions, actual stage reporting, cancellation, targeted retry, plan-review/continuation controls, generated playback with real duration, metadata edits, exports and selected soundtrack handoff. Documentation and exact evidence are under `docs/backend/`; official references are under `docs/upstream/yue2/`.
 
-Sound/Vision owns only its own service/processes. Existing ComfyUI/H3 queues are observed and preserved. Admission can wait for a busy GPU; this is not an atomic scheduler shared by all external apps. Full multi-user/public hosting remains a separate phase.
+Sound and Vision owns only its own service/processes. Existing ComfyUI/H3 queues are observed and preserved. Admission can wait for a busy GPU; this is not an atomic scheduler shared by all external apps. Full multi-user/public hosting remains a separate phase.
 
 ## Account and reference milestone
 
-The user signed into Sound/Vision's isolated OpenAI account store. Live lyrics, three song ideas, and two native image covers succeeded. A harmony-edit proposal passed exact melody and timing checks. SheetSage2 transcribed a 59.4-second original recording in 5.22 seconds; YuE2 rendered its melody into a new 59.80-second, 48 kHz stereo song in 23.79 seconds, with no truncation warnings. Browser checks passed for account state, ideas review/apply/undo, reference upload/application/reload, and genre filtering. See `docs/backend/ASSISTANCE.md` and evidence files.
+The user signed into Sound and Vision's isolated OpenAI account store. Live lyrics, three song ideas, and two native image covers succeeded. A harmony-edit proposal passed exact melody and timing checks. SheetSage2 transcribed a 59.4-second original recording in 5.22 seconds; YuE2 rendered its melody into a new 59.80-second, 48 kHz stereo song in 23.79 seconds, with no truncation warnings. Browser checks passed for account state, ideas review/apply/undo, reference upload/application/reload, and genre filtering. See `docs/backend/ASSISTANCE.md` and evidence files.
 
 ## Remaining application scope
 
@@ -28,4 +28,4 @@ See `docs/backend/VERIFICATION.md` for measured versus unverified behavior and e
 
 ## Remaining live verification
 
-The actual plan-review pause and queued/review cancellation were observed. Live cancellation during sampling and approved-plan continuation to audio remain unverified because other GPU work was active/resident. The extra verification job was cancelled and its score retained. These limits are recorded in the evidence matrix; no additional Sound/Vision GPU work was left queued.
+The actual plan-review pause and queued/review cancellation were observed. Live cancellation during sampling and approved-plan continuation to audio remain unverified because other GPU work was active/resident. The extra verification job was cancelled and its score retained. These limits are recorded in the evidence matrix; no additional Sound and Vision GPU work was left queued.

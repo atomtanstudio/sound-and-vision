@@ -34,7 +34,7 @@ Exact settings, seeds, revisions, timings, output hashes and warnings are in the
 
 ## Evidence limits
 
-The additional live active-sampling cancellation and exact-plan-to-audio continuation checks did **not** finish: another GPU service was active/resident and Sound/Vision correctly waited. The verification job `90aa62ded8684f5c8976967d878202e3` was cancelled rather than left queued for a later surprise render. Its original real score is retained in its attempt and copied to `evidence/review-score.abc`.
+The additional live active-sampling cancellation and exact-plan-to-audio continuation checks did **not** finish: another GPU service was active/resident and Sound and Vision correctly waited. The verification job `90aa62ded8684f5c8976967d878202e3` was cancelled rather than left queued for a later surprise render. Its original real score is retained in its attempt and copied to `evidence/review-score.abc`.
 
 Cancellation callbacks, targeted retry and unchanged-plan loading are implemented against upstream APIs and covered at the application boundary by tests. That is not equivalent to successful live verification of every inference-stage cancellation or approved-plan recording. See `evidence/lifecycle-verification.json`. Re-run the explicit lifecycle helper when the shared GPU is available before treating these advanced paths as fully verified.
 

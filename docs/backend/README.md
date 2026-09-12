@@ -1,4 +1,4 @@
-# Sound/Vision music backend
+# Sound and Vision music backend
 
 The music engine is installed on Legion. The current visual design is unchanged; its creation controls now submit durable jobs and the library plays real generated takes.
 
@@ -47,9 +47,9 @@ The API transaction inserts the request, one/two takes, jobs and separate cover 
 
 Only one worker process runs at a time. SQLite WAL and foreign keys preserve relational state. A service lock prevents two API owners using the same database. On restart, formerly running jobs become interrupted/failed and retain their directories; they are not silently resampled. Queued jobs remain queued. Retry creates a fresh attempt for only the selected failed/cancelled take. Completed audio is never overwritten by retry.
 
-Each worker is a child process owned by Sound/Vision. Cancellation sets an owned cancellation flag, uses upstream cancellation callbacks during planning/semantic/synthesis, and terminates only that process if needed. Linux parent-death signaling and systemd control-group shutdown prevent orphaned workers from retaining GPU memory. Decoder cancellation may require terminating the owned worker because upstream does not expose a decoder cancellation callback. This is job restart, not resumable sampling.
+Each worker is a child process owned by Sound and Vision. Cancellation sets an owned cancellation flag, uses upstream cancellation callbacks during planning/semantic/synthesis, and terminates only that process if needed. Linux parent-death signaling and systemd control-group shutdown prevent orphaned workers from retaining GPU memory. Decoder cancellation may require terminating the owned worker because upstream does not expose a decoder cancellation callback. This is job restart, not resumable sampling.
 
-The app observes both configured ComfyUI queues, requires at least 23552 MiB free GPU memory and low current utilization, and checks again before starting. YuE2’s configured 24 GiB budget reserves 2 GiB internally, limiting its PyTorch allocation pool to 22 GiB; the admission threshold leaves another 1 GiB for non-pool overhead. This avoids rejecting an otherwise idle 32 GiB device because another service retains a small context. It never calls ComfyUI interrupt/free/unload or stops another service. If external work appears during a run, Sound/Vision yields by cancelling its own worker and keeps the partial attempt for explicit retry. This is conservative contention detection, not an atomic global scheduler: unrelated apps do not honor Sound/Vision's local lock, so races remain possible until all producers share a lease protocol.
+The app observes both configured ComfyUI queues, requires at least 23552 MiB free GPU memory and low current utilization, and checks again before starting. YuE2’s configured 24 GiB budget reserves 2 GiB internally, limiting its PyTorch allocation pool to 22 GiB; the admission threshold leaves another 1 GiB for non-pool overhead. This avoids rejecting an otherwise idle 32 GiB device because another service retains a small context. It never calls ComfyUI interrupt/free/unload or stops another service. If external work appears during a run, Sound and Vision yields by cancelling its own worker and keeps the partial attempt for explicit retry. This is conservative contention detection, not an atomic global scheduler: unrelated apps do not honor Sound and Vision's local lock, so races remain possible until all producers share a lease protocol.
 
 ## Artifacts and exports
 

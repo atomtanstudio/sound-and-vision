@@ -1,6 +1,6 @@
 # Third-party notices and dependency/license matrix
 
-Snapshot: 2026-09-10. First-party Sound/Vision source, original demo lyrics and
+Snapshot: 2026-09-10. First-party Sound and Vision source, original demo lyrics and
 synthesized audio fixtures are licensed under Apache-2.0 (see `LICENSE`). This does
 not relicense external model weights, code, fonts, media or proprietary services.
 
@@ -74,7 +74,7 @@ Audio fixture WAV hashes:
 - Amber: `fc476d349224c565de7f6d5421322271a45a24ddb86cfab54a4cab64697cb16d`
 - Dusk: `757193a01230f5d788327970002aeb4034959ae0d3fc70633be779e30899f050`
 
-Sound/Vision does not assert that arbitrary generated outputs are commercially
+Sound and Vision does not assert that arbitrary generated outputs are commercially
 cleared, unrestricted, or royalty-free. Model terms and rights in input references
 remain distinct from this application's source license.
 
@@ -91,11 +91,11 @@ YuE2 source and documentation are pinned at `92a73cc7652fcc1f937855e4b765e0a0edd
 The City Lights backend baseline uses the upstream original example lyrics from `examples/song.json`. Homeward Light uses original lyrics authored for the integration check. Both names identify actual generated verification media, distinct from the earlier synthetic instrumental fixtures.
 ## VRGDG Audio Drive integration
 
-`integrations/vrgdg-audio-drive/VRGDG_MiniMaxH3AudioDrive.py` is copied unchanged from Jean Thompson's [comfyui-vrgamedevgirl](https://github.com/vrgamegirl19/comfyui-vrgamedevgirl) at commit `050ead7d9ebc46fa79190ecd5b47c1329d9b6f97`. Its upstream AGPL-3.0 notice is retained in that directory's `LICENSE`, with file hash and provenance in `source.json`. It is installed as a separate ComfyUI custom node. This third-party file is not covered by Sound/Vision's first-party Apache-2.0 license. The adapter does not include additional model weights.
+`integrations/vrgdg-audio-drive/VRGDG_MiniMaxH3AudioDrive.py` is copied unchanged from Jean Thompson's [comfyui-vrgamedevgirl](https://github.com/vrgamegirl19/comfyui-vrgamedevgirl) at commit `050ead7d9ebc46fa79190ecd5b47c1329d9b6f97`. Its upstream AGPL-3.0 notice is retained in that directory's `LICENSE`, with file hash and provenance in `source.json`. It is installed as a separate ComfyUI custom node. This third-party file is not covered by Sound and Vision's first-party Apache-2.0 license. The adapter does not include additional model weights.
 
 ## Optional local assistance providers
 
-Sound/Vision can connect to user-installed Ollama, LM Studio/llama.cpp-compatible text servers, and ComfyUI. Their binaries and model weights are not included in the release archive. Qwen3.5-4B is an Apache-2.0 model; Krea 2 Turbo weights use the Krea 2 Community License, separate from the Apache-2.0 inference-code license. Other user-selected models retain their own terms.
+Sound and Vision can connect to user-installed Ollama, LM Studio/llama.cpp-compatible text servers, and ComfyUI. Their binaries and model weights are not included in the release archive. Qwen3.5-4B is an Apache-2.0 model; Krea 2 Turbo weights use the Krea 2 Community License, separate from the Apache-2.0 inference-code license. Other user-selected models retain their own terms.
 
 - https://huggingface.co/Qwen/Qwen3.5-4B
 - https://github.com/ollama/ollama

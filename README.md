@@ -1,4 +1,4 @@
-# Sound/Vision
+# Sound and Vision
 
 A free, self-hosted music workspace with local YuE2 generation, writing assistance, cover art, kinetic lyric videos and visualizer videos. Choose an OpenAI account or local writing and ComfyUI image models. **Music video is Coming soon** while scene generation and character consistency are refined; existing music-video projects are preserved.
 

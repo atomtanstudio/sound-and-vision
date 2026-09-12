@@ -25,7 +25,7 @@ journalctl --user -u sound-vision.service -n 100 --no-pager
 systemctl --user restart sound-vision.service
 ```
 
-Restart only when no generation is active unless interruption is intentional. A restart preserves queued jobs and successful outputs; an in-flight attempt becomes interrupted and can be retried. Never restart ComfyUI/H3LIX to manage Sound/Vision.
+Restart only when no generation is active unless interruption is intentional. A restart preserves queued jobs and successful outputs; an in-flight attempt becomes interrupted and can be retried. Never restart ComfyUI/H3LIX to manage Sound and Vision.
 
 Health without printing the token:
 
@@ -39,7 +39,7 @@ The API configuration and token are `/srv/ai/sound-vision/service.env` and `serv
 
 Music-video creation, scene rendering and recovery below are internal development features, disabled in this release. See [AI setup](LOCAL_PROVIDERS.md) for the release gate and supported local providers.
 
-`SOUND_VISION_IMAGE_CONCURRENCY` in `service.env` sets the shared image-request limit. It defaults to 8 and accepts integers from 1 through 32. This is an application resource limit: the installed Codex runtime and the official documentation do not disclose an account-specific ImageGen concurrency maximum. Increasing it does not establish provider capacity. Apply changes by restarting Sound/Vision when idle.
+`SOUND_VISION_IMAGE_CONCURRENCY` in `service.env` sets the shared image-request limit. It defaults to 8 and accepts integers from 1 through 32. This is an application resource limit: the installed Codex runtime and the official documentation do not disclose an account-specific ImageGen concurrency maximum. Increasing it does not establish provider capacity. Apply changes by restarting Sound and Vision when idle.
 
 Character sheets run in parallel first. The first storyboard image for each location runs next, followed by the other frames using those saved location and character references. Results stay in scene order. A failed request stops further scheduling while other in-flight requests finish and save; recovery reuses matching completed images.
 

@@ -44,7 +44,7 @@ muxing is disabled to avoid introducing replacements or timing drift.
 Server production root:
 `/srv/ai/sound-vision/data/films/two-films-20260910/`.
 The local delivery root mirrors its two song folders. Source video clips stay
-in durable H3LIX and Sound/Vision production folders on Legion.
+in durable H3LIX and Sound and Vision production folders on Legion.
 
 ## Timing audit
 

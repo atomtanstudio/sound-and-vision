@@ -1,6 +1,6 @@
 # Self-hosted AI setup
 
-Sound/Vision supports two installation choices: an OpenAI account, or local text and image servers. Choose **Your account → AI setup**. Saving changes which providers handle future requests; it never silently falls back to OpenAI. Existing recordings, cover images and OpenAI sign-in credentials are preserved.
+Sound and Vision supports two installation choices: an OpenAI account, or local text and image servers. Choose **Your account → AI setup**. Saving changes which providers handle future requests; it never silently falls back to OpenAI. Existing recordings, cover images and OpenAI sign-in credentials are preserved.
 
 Music video is **Coming soon** in this release. Its navigation choice is disabled, and saved-project links show a holding page. Backend film generation and recovery requests are blocked. Existing projects and exports remain on disk. Kinetic lyric videos and visualizer videos remain available. Internal development can explicitly enable both `VITE_ENABLE_MUSIC_VIDEO=true` when building the frontend and `SOUND_VISION_ENABLE_MUSIC_VIDEO=1` for the backend; neither is enabled in the release.
 
@@ -24,7 +24,7 @@ Release testing with Qwen3.5 4B passed song-description and complete lyric-draft
 
 ## Choose ComfyUI images
 
-Use a current [ComfyUI installation](https://docs.comfy.org/installation). Enter its URL, such as `http://127.0.0.1:8188`. These addresses are reached **from the Sound/Vision backend**, not from the browser. For containers use a private reachable address; `localhost` always refers to the process's own network namespace.
+Use a current [ComfyUI installation](https://docs.comfy.org/installation). Enter its URL, such as `http://127.0.0.1:8188`. These addresses are reached **from the Sound and Vision backend**, not from the browser. For containers use a private reachable address; `localhost` always refers to the process's own network namespace.
 
 **Krea 2 Turbo** is the default. The built-in graph follows Comfy's [official Krea 2 template](https://docs.comfy.org/tutorials/image/krea/krea-2): 8 steps, Euler/simple, CFG 1, a Qwen3VL text encoder and the Qwen image VAE. The selected local writing model turns the cover's song context into a visual prompt before ComfyUI renders it. No account-backed Krea API is used.
 
@@ -44,7 +44,7 @@ For another architecture, export a working text-to-image graph from ComfyUI in *
 
 ## Models on another disk
 
-ComfyUI owns model discovery. Sound/Vision reads its index rather than searching the user's filesystem or assuming the browser and model host share a disk.
+ComfyUI owns model discovery. Sound and Vision reads its index rather than searching the user's filesystem or assuming the browser and model host share a disk.
 
 Under **Models stored in another folder**, enter the models root as seen by ComfyUI, save, then download `soundvision-model-paths.yaml`. Load it with:
 
@@ -60,7 +60,7 @@ Local image requests share the music service's GPU mutex and check the configure
 
 Canceling a queued test removes only its own ComfyUI prompt. A running local image is allowed to finish before releasing the shared GPU; it does not send a global interrupt. A connection loss during submission is not automatically retried. Inspect the retained receipt in `data/provider-jobs/` before starting another attempt if the outcome is uncertain.
 
-This is coordination within Sound/Vision, not a global GPU scheduler for every application. Other model servers must manage their own memory, and external applications can still submit work independently.
+This is coordination within Sound and Vision, not a global GPU scheduler for every application. Other model servers must manage their own memory, and external applications can still submit work independently.
 
 ## Installation and configuration
 
@@ -74,7 +74,7 @@ The existing [Linux GPU backend installation](OPERATIONS.md) remains required fo
   --image-model krea2_turbo_fp8_scaled.safetensors
 ```
 
-Use `--model-root` for another ComfyUI models root, or `--image-preset sdxl --image-model filename.safetensors`. The UI also supports API-workflow import. The private `providers.json` has mode 0600. Back it up separately from any public release; API keys are excluded from public status responses. Restart Sound/Vision while idle after CLI configuration. UI saves apply without a restart and are blocked during active assistance work.
+Use `--model-root` for another ComfyUI models root, or `--image-preset sdxl --image-model filename.safetensors`. The UI also supports API-workflow import. The private `providers.json` has mode 0600. Back it up separately from any public release; API keys are excluded from public status responses. Restart Sound and Vision while idle after CLI configuration. UI saves apply without a restart and are blocked during active assistance work.
 
 OpenAI users install the existing account runtime. Local-only users can omit it; if reference-audio transcription is wanted, `deploy/install_assistance.py --skip-openai --root <root> --models <models>` installs just the reference runtime. No OpenAI account is needed for local writing, cover art, lyric-video images or music generation.
 

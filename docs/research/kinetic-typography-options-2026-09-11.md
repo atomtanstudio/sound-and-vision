@@ -1,8 +1,8 @@
-# Sound / Vision: kinetic typography options
+# Sound and Vision: kinetic typography options
 
 Researched 11 September 2026. Scope: 30 existing tools and resources, 18 proposed visual styles, and an integration recommendation. This is research, not an installed feature or a performance benchmark. Capabilities and licensing below come from the linked project/vendor sources; suggested applications and effort are engineering judgments. The application findings come from the current workspace source, not a new audit of the deployed Legion service.
 
-## What Sound / Vision currently uses
+## What Sound and Vision currently uses
 
 There are three distinct systems:
 
@@ -26,7 +26,7 @@ A generated blank wall or paper texture can supply atmosphere. Put the lettering
 
 ## The styles worth offering
 
-These are proposed Sound / Vision styles, not claims that every tool below already contains a finished lyric-video preset. Effort is relative to the current code: **S** = mostly layout/timing work; **M** = new scene or asset system; **L** = substantial simulation, rendering or generation work. A shared export path is additional work across the collection.
+These are proposed Sound and Vision styles, not claims that every tool below already contains a finished lyric-video preset. Effort is relative to the current code: **S** = mostly layout/timing work; **M** = new scene or asset system; **L** = substantial simulation, rendering or generation work. A shared export path is additional work across the collection.
 
 | Style | Suitable music | Type, placement and action | Likely ingredients | Effort |
 |---|---|---|---|---|
@@ -73,7 +73,7 @@ These are building blocks. Except where stated, they need our own lyric layout, 
 |---|---|---|---|
 | 4 | [Anime.js text tools](https://animejs.com/documentation/text/) · [MIT source](https://github.com/juliangarnier/anime) | Word/character splitting, staggered animation, coordinated DOM/SVG/object timelines | Good general animation ingredient. Layout and song synchronization remain ours. Drive animation from the composition time, not an independent playback loop. |
 | 5 | [Motion](https://motion.dev/) | React/JavaScript animation, springs, transforms and layout transitions | MIT core. Useful for restrained presets and the editor; video rendering needs deterministic time control. Optional paid products do not follow automatically from the core license. |
-| 6 | [GSAP text tools](https://gsap.com/text/) · [current license](https://gsap.com/community/standard-license/) | Split text, coordinated timelines, elaborate SVG drawing/morphing and camera-like transforms | No-charge custom license, not MIT. It restricts certain competing visual animation builders; its FAQ permits various niche tools. Whether a future visual editor falls inside that restriction is a product-specific question, not a blanket prohibition on Sound / Vision. Anime.js avoids this particular dependency decision. |
+| 6 | [GSAP text tools](https://gsap.com/text/) · [current license](https://gsap.com/community/standard-license/) | Split text, coordinated timelines, elaborate SVG drawing/morphing and camera-like transforms | No-charge custom license, not MIT. It restricts certain competing visual animation builders; its FAQ permits various niche tools. Whether a future visual editor falls inside that restriction is a product-specific question, not a blanket prohibition on Sound and Vision. Anime.js avoids this particular dependency decision. |
 | 7 | [PixiJS text](https://pixijs.com/8.x/guides/components/scene-objects/text) · [filters and demos](https://github.com/pixijs/filters) · [core license](https://github.com/pixijs/pixijs) | Accelerated 2D text, sprites, masks, particles, glitch, CRT, bloom and displacement treatments | MIT core. Useful for collage and distressed text. Effects are not lyric layouts; pin compatible renderer/filter versions and check selected dependencies. |
 | 8 | [Three.js + Troika text](https://protectwise.github.io/troika/troika-three-text/) · [Troika source](https://github.com/protectwise/troika) | Sharp spatial text, perspective, curved arrangements and scene lighting | Three.js/Troika are MIT. A strong route for tunnels, word maps and text attached to surfaces. Troika's text geometry is not automatically solid extruded lettering; choose other geometry for true solid letters. Font licensing remains separate. |
 | 9 | [Matter.js](https://brm.io/matter-js/) · [source](https://github.com/liabru/matter-js) | Rigid-body collisions, constraints, gravity and tumbling word/letter bodies | MIT. Pair with a renderer. A physics engine does not supply glyph design or music timing. Bake fixed-step simulation or replay from deterministic checkpoints so seeks and exports agree. |

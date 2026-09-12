@@ -3,10 +3,10 @@
 Created for Rich's example of a melancholy, low-fi/ambient song: blue-gray
 color, slow layered movement, soft illumination and restrained reactions.
 The shader is new project code; no community gallery shader was imported.
-It follows Sound/Vision's Apache-2.0 license. The included Manrope font retains
+It follows Sound and Vision's Apache-2.0 license. The included Manrope font retains
 its OFL license.
 
-Preview: `/shader-studies/blue-hour/index.html` on the existing Sound/Vision
+Preview: `/shader-studies/blue-hour/index.html` on the existing Sound and Vision
 development server. `blue-hour.html` is the downloadable, self-contained
 version: shader, runtime and font are embedded; a chosen local song stays in
 the browser. `blue-hour.frag` is the editable shader source.

@@ -52,7 +52,7 @@ Keep private font files out of the source repository and public web directory.
 
 LosslessCut 3.69.0 is installed on the Mac. Its
 [documented merge workflow](https://github.com/mifi/lossless-cut) copies compatible
-compressed streams using FFmpeg. Sound/Vision now uses that same underlying FFmpeg
+compressed streams using FFmpeg. Sound and Vision now uses that same underlying FFmpeg
 capability through our own code; no GPL-licensed LosslessCut code was copied.
 
 Previously each directed export encoded every scene at CRF 18 and then encoded the

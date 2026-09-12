@@ -12,7 +12,7 @@ Validation covered synthetic sample preservation, the actual saved scene's audio
 
 The provider delta is `integrations/h3-singularity-first-pass/vocal-lock.patch`, applied after the first-pass integration. Deployment hashes and the guarded installation/rollback procedure are in `deliveries/vocal-lock-20260912/`. The remaining sections document the earlier fused-Turbo workflow.
 
-Sound/Vision now offers **VRGDG Audio Drive + H3 Turbo · test** when creating a music video. It combines Jean Thompson's source-audio locking technique with the existing H3LIX four-step fused Turbo renderer. This is an adaptation of her construction technique, not the complete upstream Builder UI or its full graph.
+Sound and Vision now offers **VRGDG Audio Drive + H3 Turbo · test** when creating a music video. It combines Jean Thompson's source-audio locking technique with the existing H3LIX four-step fused Turbo renderer. This is an adaptation of her construction technique, not the complete upstream Builder UI or its full graph.
 
 Choose a song, create a new project, select this workflow, and enter a video direction. **Use industrial-metal direction** fills a contemporary male factory-worker concept tailored to *A Mouth Beneath the Skin*. Creating the storyboard also creates a fresh shared visual reference. Review that image before rendering.
 
@@ -32,16 +32,16 @@ Render one scene or the remaining scenes, then use the existing review/export wo
 
 ## Implementation and deployment
 
-Sound/Vision: `backend/film_audio_drive.py`, with opt-in branches in film creation, rendering and review. H3LIX: `server/audio-drive.mjs`, plus the small graph/job patch retained under `integrations/h3lix-audio-drive/`. Graph and model baseline checks preserve ordinary H3LIX requests unchanged.
+Sound and Vision: `backend/film_audio_drive.py`, with opt-in branches in film creation, rendering and review. H3LIX: `server/audio-drive.mjs`, plus the small graph/job patch retained under `integrations/h3lix-audio-drive/`. Graph and model baseline checks preserve ordinary H3LIX requests unchanged.
 
 Only the Audio Drive node is installed, via a read-only directory mount in the existing Turbo container. No whole upstream plugin, model download, package install or ComfyUI core change was needed. The node source, upstream notice and revision/hash metadata are retained under `integrations/vrgdg-audio-drive/`.
 
-Current H3LIX release: `/srv/ai/h3lix-releases/20260911-audio-drive`. Previous release: `/srv/ai/h3lix-releases/20260910T150529Z`. Sound/Vision backend backups: `/srv/ai/sound-vision/updates/audio-drive-20260911-backup`. The prior Turbo compose file is `compose.pre-audio-drive-20260911.yaml` in `/srv/ai/research/h3-fused-turbo/deploy/`. Stop/restart only when the app and render queues are idle. Rollback can restore the old H3LIX release link and backed-up backend files; the independent unused custom node may remain installed.
+Current H3LIX release: `/srv/ai/h3lix-releases/20260911-audio-drive`. Previous release: `/srv/ai/h3lix-releases/20260910T150529Z`. Sound and Vision backend backups: `/srv/ai/sound-vision/updates/audio-drive-20260911-backup`. The prior Turbo compose file is `compose.pre-audio-drive-20260911.yaml` in `/srv/ai/research/h3-fused-turbo/deploy/`. Stop/restart only when the app and render queues are idle. Rollback can restore the old H3LIX release link and backed-up backend files; the independent unused custom node may remain installed.
 
 ## Verification on September 11, 2026
 
 - H3LIX: 178 tests passed, including complete output-graph comparison with the existing fused Turbo recipe and unchanged quality baseline.
-- Sound/Vision backend: 81 tests passed, including variable timing, cut edits, exact frame coverage, reference hash rejection, request isolation, nonduplicating retries, old-take retention and pixel-preserving final assembly.
+- Sound and Vision backend: 81 tests passed, including variable timing, cut edits, exact frame coverage, reference hash rejection, request isolation, nonduplicating retries, old-take retention and pixel-preserving final assembly.
 - Existing offline browser suite: all 16 checks passed with the installed Chromium executable. TypeScript and the Vite build passed.
 - Browser: correct song/take, new workflow, native size, editable industrial-metal direction and flexible timing confirmed; the new-project draft survived reload at `/video?film=new`.
 - Deployed render and export: one three-second excerpt at 1344×768, 72 final frames, four steps, 35 seconds reported by H3LIX. No internal cut was detected by the existing heuristic. This engineering check used the previously approved reference; it is not a new creative full-song result.
