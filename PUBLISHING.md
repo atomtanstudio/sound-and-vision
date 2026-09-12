@@ -1,21 +1,9 @@
-# Publication preparation
+# Publication record
 
-The local repository uses `main`. Private credentials, model weights, generated productions and operational receipts are excluded from Git. The application source and user data have separate backup paths.
+Authorized public destination: `atomtanstudio/sound-and-vision`. Branch: `main`. First public release: `v0.1.0-rc.1`. The README leads with the revised 80-second promo, then four user-supplied examples. Videos are release attachments, keeping the source checkout lightweight.
 
-The proposed public destination is `atomtanstudio/sound-vision`. It was not present in the configured GitHub account during preparation. No remote repository has been created and nothing has been pushed.
+Private credentials, model weights, user libraries, operational logs, and generated productions remain excluded from Git. The four originals in Downloads are preserved.
 
-Before publication, review the installation guide and model-license notices. The application remains a self-hosted release candidate: music video is Coming soon, and the current packaged music admission threshold still targets a 24 GB GPU. A verified 16 GB mode and larger local writing-model benchmarks are separate work.
+The audited backend changes were deployed to the live Linux service and passed 155 backend tests. This does not substitute for a clean-machine installation test. The current music baseline remains approximately 24 GiB free VRAM; music-video generation remains Coming soon.
 
-The security-reviewed dependency/configuration changes have been tested locally. They have not been deployed to the existing Linux music service as part of this pass. Keep the existing installation backup and upgrade/recheck it while idle before representing this revision as a fresh GPU-host installation test.
-
-After the owner confirms the public destination, the publication operation is:
-
-```sh
-gh repo create atomtanstudio/sound-vision --public --source=. --remote=origin --push
-```
-
-This command publishes the committed history. Do not run it against an unaudited checkout. Use `scripts/package-selfhost.py` to produce a separately scanned source ZIP; do not upload the entire working folder or a raw filesystem archive.
-
-Enable GitHub private vulnerability reporting after creating the repository so the security policy has a private reporting channel.
-
-Git commits use the configured account's no-reply address. The private audit report and raw scan/test logs remain outside the repository.
+Publish only the audited committed source and curated release package. Keep the model-license notices, self-hosted scope, and experimental-video caption visible. Enable private vulnerability reporting on GitHub.

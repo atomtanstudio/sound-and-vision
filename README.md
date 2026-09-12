@@ -1,5 +1,24 @@
 # Sound and Vision
 
+## Watch Sound and Vision
+
+[![Watch the 80-second promo](docs/showcase/promo.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/sound-and-vision-promo.mp4)
+
+**Start here: [Sound and Vision promo · 1:20](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/sound-and-vision-promo.mp4)**
+
+### Example videos
+
+| Example | Watch |
+| --- | --- |
+| [![Kinetic lyric video](docs/showcase/example-1.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-1.mp4) | [Example 1: Kinetic lyric video · 4:25](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-1.mp4) |
+| [![Music video — experimental workflow](docs/showcase/example-2.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-2.mp4) | [Example 2: Music video — experimental workflow · 4:40](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-2.mp4) |
+| [![Visualizer and lyrics](docs/showcase/example-3.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-3.mp4) | [Example 3: Visualizer and lyrics · 4:17](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-3.mp4) |
+| [![Video clips and lyrics](docs/showcase/example-4.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-4.mp4) | [Example 4: Video clips and lyrics · 3:13](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-4.mp4) |
+
+Videos are attached to the release rather than stored in Git history. The music-video example demonstrates an experimental workflow; music-video generation remains **Coming soon** in this release.
+
+
+
 A free, self-hosted music workspace with local YuE2 generation, writing assistance, cover art, kinetic lyric videos and visualizer videos. Choose an OpenAI account or local writing and ComfyUI image models. **Music video is Coming soon** while scene generation and character consistency are refined; existing music-video projects are preserved.
 
 Start with the [self-hosted installation guide](SELF_HOSTED.md), then [AI setup](docs/backend/LOCAL_PROVIDERS.md) for **Qwen3.5 + Ollama**, **Krea 2 Turbo**, SDXL or a custom ComfyUI workflow. Local mode needs no OpenAI account. The music backend currently targets Linux and a compatible NVIDIA GPU; this is a single-owner installation, not a public multi-user service.
