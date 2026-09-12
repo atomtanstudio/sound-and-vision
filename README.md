@@ -2,7 +2,7 @@
 
 ## Watch Sound and Vision
 
-[![Watch the 80-second promo](docs/showcase/promo.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/sound-and-vision-promo.mp4)
+https://github.com/user-attachments/assets/debae6f5-3119-43a6-b429-c377c6a237c3
 
 **Start here: [Sound and Vision promo · 1:20](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/sound-and-vision-promo.mp4)**
 
