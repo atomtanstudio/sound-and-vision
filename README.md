@@ -8,28 +8,40 @@ https://github.com/user-attachments/assets/debae6f5-3119-43a6-b429-c377c6a237c3
 
 ### Example videos
 
-[![Example 1: Kinetic lyric video](docs/showcase/example-1.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-1.mp4)
+https://github.com/user-attachments/assets/c1f06bdd-1a20-42a5-ae09-94429ac93eb6
 
-**[Example 1: Kinetic lyric video · 4:25](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-1.mp4)**  
+**Example 1: Kinetic lyric video — 30-second preview**
+
+[Download the full video · 4:25](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-1.mp4)
+
 Animated lyric typography over a visual background.
 
-[![Example 2: Music video — experimental workflow](docs/showcase/example-2.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-2.mp4)
+https://github.com/user-attachments/assets/00cfb259-6bd5-4cb9-8406-b7ac82bf8a69
 
-**[Example 2: Music video — experimental workflow · 4:40](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-2.mp4)**  
+**Example 2: Music video — experimental workflow — 30-second preview**
+
+[Download the full video · 4:40](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-2.mp4)
+
 A scene-based music-video example. This feature remains Coming soon in the release.
 
-[![Example 3: Visualizer and lyrics](docs/showcase/example-3.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-3.mp4)
+https://github.com/user-attachments/assets/85fb3882-3746-4361-92b9-395c290204ab
 
-**[Example 3: Visualizer and lyrics · 4:17](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-3.mp4)**  
+**Example 3: Visualizer and lyrics — 30-second preview**
+
+[Download the full video · 4:17](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-3.mp4)
+
 Audio-reactive visuals with lyrics on screen.
 
-[![Example 4: Video clips and lyrics](docs/showcase/example-4.jpg)](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-4.mp4)
+https://github.com/user-attachments/assets/8d72feaf-2332-4ebb-96c9-99261b0de091
 
-**[Example 4: Video clips and lyrics · 3:13](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-4.mp4)**  
+**Example 4: Video clips and lyrics — 30-second preview**
+
+[Download the full video · 3:13](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-4.mp4)
+
 Video footage paired with on-screen lyrics.
 
 
-Videos are attached to the release rather than stored in Git history. The music-video example demonstrates an experimental workflow; music-video generation remains **Coming soon** in this release.
+The promo plays in full; each example above is a 30-second preview. Full-quality originals are available through the download links and release attachments rather than stored in Git history. The music-video example demonstrates an experimental workflow; music-video generation remains **Coming soon** in this release.
 
 
 
