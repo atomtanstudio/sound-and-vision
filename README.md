@@ -4,14 +4,11 @@ A free, self-hosted music workspace with local YuE2 generation, writing assistan
 
 Start with the [self-hosted installation guide](SELF_HOSTED.md), then [AI setup](docs/backend/LOCAL_PROVIDERS.md) for **Qwen3.5 + Ollama**, **Krea 2 Turbo**, SDXL or a custom ComfyUI workflow. Local mode needs no OpenAI account. The music backend currently targets Linux and a compatible NVIDIA GPU; this is a single-owner installation, not a public multi-user service.
 
-## Start the connected app
+## Installation
 
-```sh
-npm install
-npm run dev
-```
+**One Linux computer is enough:** the app, music backend, and optional local AI providers can all run together. The current music baseline is a compatible NVIDIA GPU with approximately 24 GiB free VRAM.
 
-Use Node.js 22.18 or newer for the app launcher and its native TypeScript helpers; this build used Node.js 26.7.0. Open http://127.0.0.1:5190/music. Operator configuration in `.env.local` creates a private SSH connection to Legion and supplies the API token only to the local server-side proxy. See `.env.example` and [backend operations](docs/backend/OPERATIONS.md) for another installation. Credentials are never bundled into the frontend.
+Follow the [step-by-step setup guide](SELF_HOSTED.md). It covers prerequisites, backend installation, the private local connection, optional AI providers, and your first song. Start there before running `npm run dev`; installing the frontend alone does not install the music backend. A second computer and SSH are optional.
 
 ## Working music flow
 
@@ -24,7 +21,7 @@ Use Node.js 22.18 or newer for the app launcher and its native TypeScript helper
 - Cancel a job, retry only a failed/cancelled take, and retain earlier attempts and artifacts.
 - Rename, favorite, move to a project, and select a generated song as the Video soundtrack.
 
-The isolated Legion service uses Python 3.12, pinned YuE2/PyTorch/model revisions, SQLite metadata and filesystem media. It observes existing GPU queues, serializes its own jobs and releases its model memory afterward. It does not modify or unload existing ComfyUI/H3 services.
+The isolated backend service uses Python 3.12, pinned YuE2/PyTorch/model revisions, SQLite metadata and filesystem media. It observes existing GPU queues, serializes its own jobs and releases its model memory afterward. It does not modify or unload existing ComfyUI/H3 services.
 
 ## Documentation
 
@@ -45,7 +42,7 @@ The complete upstream documentation, examples, skill references, model cards and
 
 OpenAI account sign-in, local providers, reviewed song ideas/lyrics/style/score edits, per-take cover art, and reference-audio transcription are connected. See [Assistance and reference songs](docs/backend/ASSISTANCE.md) for usage and installation. Music creation uses reviewed lyrics; reference audio supplies a melody or full score, not sung-word transcription. Public D1 hosting remains separate. Music-video generation is disabled in the release. The two original instrumental fixtures remain samples, not YuE2 output.
 
-The browser's local draft editor still works without a configured backend. Generated takes and their metadata live on Legion. A public multi-user deployment needs a separate user-access/authentication layer; the current service is a private single-owner installation.
+The browser's local draft editor still works without a configured backend. Generated takes and their metadata live on your backend computer. A public multi-user deployment needs a separate user-access/authentication layer; the current service is a private single-owner installation.
 
 ## Checks
 

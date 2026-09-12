@@ -78,3 +78,13 @@ The demo page, repository README and complete repository tree were checked on 10
 After the base YuE2 service installation, stop only `sound-vision.service` before installing/updating its runtimes, then copy `backend/`, `db/`, and `deploy/` into the service root. Run `python3 deploy/install_assistance.py --root /srv/ai/sound-vision --models /srv/ai/models/yue2` on Legion as the service owner. It verifies the official Codex package, creates a separate Python 3.11 runtime using the installed `uv`, installs pinned reference dependencies, and downloads the two pinned public models. Install the updated base `backend/requirements.txt`, then start/restart `sound-vision.service`. Sign in using the app's account panel.
 
 `deploy/verify_assistance.py --submit` deliberately spends account usage and transcribes an existing original song. Without `--submit`, it only polls the retained run. `scripts/verify-assistance-browser.mjs --live` similarly makes one real idea request and one reference upload. `--resume` reuses recorded results after a browser-check interruption. The normal `npm test` suite mocks API calls and creates no music/account jobs.
+
+## Installation
+
+First complete the [main installation guide](../../SELF_HOSTED.md). The optional installer currently expects `uv` at `~/.local/bin/uv` and installs both the account runtime and a separate reference-transcription environment. It downloads additional packages and model weights. Run as the backend service owner, from the application folder, using the same model directory selected during setup:
+
+```sh
+.venv/bin/python deploy/install_assistance.py --root "$PWD" --models "$PWD/models"
+```
+
+Use `--skip-openai` if you want only reference transcription. Local writing and ComfyUI images do not require this installer. After installation, connect the OpenAI account through **Your account** if you chose that provider. The pinned account binaries target Linux x86-64; this optional installation is not a macOS or Windows installer.
