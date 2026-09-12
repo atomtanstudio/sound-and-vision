@@ -1,0 +1,21 @@
+[Unit]
+Description=Sound/Vision music API and YuE2 job worker
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@ROOT@
+EnvironmentFile=@ROOT@/service.env
+Environment=PYTHONUNBUFFERED=1
+Environment=OMP_NUM_THREADS=8
+Environment=MKL_NUM_THREADS=8
+ExecStart=@ROOT@/.venv/bin/python -m uvicorn backend.api:create_app --factory --host 127.0.0.1 --port 5191 --workers 1 --no-access-log
+Restart=on-failure
+RestartSec=4
+KillMode=control-group
+TimeoutStopSec=25
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

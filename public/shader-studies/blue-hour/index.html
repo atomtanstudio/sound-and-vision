@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Blue Hour · Sound/Vision</title>
+  <style>
+    @font-face {
+      font-family: Manrope;
+      src: url("./manrope.woff2");
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #0c1015;
+      color: #dbe0e6;
+      font:
+        14px Manrope,
+        system-ui,
+        sans-serif;
+    }
+    button,
+    a,
+    label {
+      touch-action: manipulation;
+    }
+    button,
+    .file-label,
+    .download {
+      font: inherit;
+      color: inherit;
+      border: 1px solid #303944;
+      background: #151c25;
+      padding: 10px 15px;
+      border-radius: 7px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button:hover,
+    .file-label:hover,
+    .download:hover {
+      background: #212b38;
+    }
+    button:focus-visible,
+    a:focus-visible,
+    label:focus-within {
+      outline: 2px solid #9aafc3;
+      outline-offset: 4px;
+    }
+    header {
+      max-width: 1420px;
+      margin: auto;
+      padding: 25px 32px;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: center;
+    }
+    header a {
+      color: #a5afbc;
+      text-decoration: none;
+      font-size: 12px;
+      letter-spacing: 0.1em;
+    }
+    header span {
+      font-size: 12px;
+      color: #768594;
+    }
+    main {
+      max-width: 1420px;
+      padding: 0 32px 30px;
+      margin: auto;
+    }
+    .stage {
+      position: relative;
+      aspect-ratio: 16/9;
+      width: min(100%, calc((100dvh - 290px) * 16 / 9));
+      margin: auto;
+      background: #101a25;
+      border: 1px solid #27303a;
+      overflow: hidden;
+      border-radius: 10px;
+    }
+    .stage.portrait {
+      aspect-ratio: 9/16;
+      width: min(100%, calc((100dvh - 290px) * 9 / 16));
+      margin: auto;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .caption {
+      position: absolute;
+      left: 5.5%;
+      bottom: 8%;
+      pointer-events: none;
+    }
+    .caption small {
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      color: #8a9ba9;
+      text-transform: uppercase;
+    }
+    .caption h1 {
+      font:
+        500 clamp(28px, 4.6vw, 64px)/1.1 Georgia,
+        serif;
+      letter-spacing: -0.05em;
+      margin: 10px 0 0;
+      color: #cad7df;
+    }
+    .caption p {
+      font-size: 11px;
+      color: #90a3b2;
+      margin: 12px 0 0;
+      letter-spacing: 0.05em;
+    }
+    .controls {
+      padding: 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid #252d35;
+    }
+    .buttons {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .file-label input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+    }
+    .toggle {
+      display: inline-flex;
+      gap: 9px;
+      align-items: center;
+      color: #a9b5c1;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .toggle input {
+      accent-color: #a4b9c9;
+    }
+    .response-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: #a9b5c1;
+      font-size: 12px;
+    }
+    .response-control input {
+      width: 86px;
+      accent-color: #a4b9c9;
+    }
+    .response-control output {
+      width: 35px;
+      font-variant-numeric: tabular-nums;
+    }
+    .details {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 18px 0;
+      font-size: 12px;
+      color: #8795a3;
+      line-height: 1.7;
+    }
+    .details p {
+      margin: 0;
+      max-width: 650px;
+    }
+    #status {
+      color: #b6c4cf;
+      white-space: pre-line;
+    }
+    audio {
+      width: 100%;
+      height: 36px;
+      margin-top: 16px;
+      color-scheme: dark;
+    }
+    #error {
+      color: #edb1a8;
+      padding: 12px 0;
+      margin: 0;
+    }
+    #levels {
+      width: 88px;
+      height: 3px;
+      background: #25303a;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #level-fill {
+      height: 100%;
+      background: #94b5cd;
+      width: 0;
+    }
+    .meter {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .aspect {
+      font-size: 12px;
+    }
+    footer {
+      font-size: 11px;
+      color: #556575;
+      padding: 10px 0;
+    }
+    @media (max-width: 650px) {
+      header {
+        padding: 20px;
+      }
+      main {
+        padding: 0 16px 20px;
+      }
+      .controls,
+      .details {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 15px;
+      }
+      .stage {
+        border-radius: 6px;
+      }
+      .caption p {
+        display: none;
+      }
+      .caption h1 {
+        font-size: 32px;
+      }
+      .caption small {
+        font-size: 8px;
+      }
+      header span {
+        font-size: 10px;
+      }
+      .buttons button,
+      .file-label,
+      .download {
+        padding: 9px 11px;
+        font-size: 12px;
+      }
+    }
+  </style>
+  <header>
+    <a href="/video">SOUND / VISION</a><span>Original shader study · 01</span>
+  </header>
+  <main>
+    <div class="stage" id="stage">
+      <canvas
+        id="canvas"
+        aria-label="Blue-gray translucent forms flowing slowly, responding gently to audio"
+      ></canvas>
+      <div class="caption" id="caption">
+        <small>Original shader · 01</small>
+        <h1>Blue Hour</h1>
+        <p>SLATE · MIST · SLOW WATER</p>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="buttons">
+        <label class="file-label"
+          >Load a song<input id="file" type="file" accept="audio/*"
+        /></label>
+        <button id="demo">Use Good Company</button>
+        <button id="test">Test rhythm</button>
+        <a class="download" href="./blue-hour.frag" download>Download shader</a>
+      </div>
+      <div class="buttons">
+        <label class="toggle"
+          ><input id="reactive" type="checkbox" checked />Respond to
+          audio</label
+        >
+        <label class="response-control">
+          Strength
+          <input
+            id="response"
+            type="range"
+            min="0.25"
+            max="2"
+            step="0.05"
+            value="1"
+          />
+          <output id="response-value" for="response">100%</output>
+        </label>
+        <label class="toggle"
+          ><input id="titles" type="checkbox" checked />Title</label
+        >
+        <button class="aspect" id="aspect" aria-label="Switch aspect ratio">
+          16:9
+        </button>
+      </div>
+    </div>
+    <audio id="audio" controls hidden></audio>
+    <p id="error" role="alert" hidden></p>
+    <div class="details">
+      <p>
+        Bass hits open and illuminate the folds. Higher frequencies bring out
+        the fine texture. Adjust Strength for a softer or more pronounced
+        response.
+      </p>
+      <div>
+        <div class="meter">
+          <span id="status" aria-live="polite"
+            >Ambient motion · load a song to hear the response</span
+          >
+          <div id="levels" aria-label="Measured bass energy">
+            <div id="level-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <footer>
+      Original GLSL · Apache-2.0 · Uses FragCoord’s documented audio texture
+      format ·
+      <a href="./blue-hour.html" download style="color: inherit"
+        >Download standalone preview</a
+      >
+    </footer>
+  </main>
+  <script type="module" src="./study.js"></script>
+</html>

@@ -1,0 +1,50 @@
+[
+  {
+    "id": 0,
+    "name": "Vault",
+    "description": "Sculptural perspective tunnel",
+    "mood": "Expansive, driving"
+  },
+  {
+    "id": 1,
+    "name": "Mercury",
+    "description": "Liquid metal and studio reflections",
+    "mood": "Fluid, nocturnal"
+  },
+  {
+    "id": 2,
+    "name": "Satellites",
+    "description": "Particles moving through orbital paths",
+    "mood": "Weightless, intimate"
+  },
+  {
+    "id": 3,
+    "name": "Strata",
+    "description": "Living topographic contours",
+    "mood": "Organic, reflective"
+  },
+  {
+    "id": 4,
+    "name": "Index",
+    "description": "Precision rings and radial geometry",
+    "mood": "Mechanical, insistent"
+  },
+  {
+    "id": 5,
+    "name": "Silk",
+    "description": "Luminous flowing ribbon surfaces",
+    "mood": "Lush, melodic"
+  },
+  {
+    "id": 6,
+    "name": "Facet",
+    "description": "Refractive crystal cluster",
+    "mood": "Spacious, still"
+  },
+  {
+    "id": 7,
+    "name": "Afterimage",
+    "description": "Warm analog wave interference",
+    "mood": "Worn, hypnotic"
+  }
+]

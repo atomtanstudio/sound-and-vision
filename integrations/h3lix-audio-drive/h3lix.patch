@@ -1,0 +1,81 @@
+--- a/server/graphs.mjs
++++ b/server/graphs.mjs
+@@ -1,3 +1,4 @@
++import { normalizeAudioDrive, attachAudioDrive } from './audio-drive.mjs';
+ // MiniMax H3 graph construction — ported from the proven builder in the old
+ // H3LIX generator and extended with the full frame set the H3Studio node
+ // exposes (16:9, 9:16, 1:1, 4:5, 5:4, custom).
+@@ -983,6 +984,9 @@
+ // Keep the quality/still builder intact. Video Turbo is the user's verified
+ // 2026-09-06 graph, with no preview wrapper, extra LoRA, RIFE or forced unload.
+ export function buildEzTurboGraph(request, uploadedAssets = [], runId = "h3", options = {}) {
++  request = normalizeAudioDrive(request.audioDrive ? { ...request, assets: uploadedAssets } : request);
++  if (request.audioDrive === 'vrgdg-source' && (options.output === 'image' || (options.turbo !== undefined && options.turbo !== 'On' && options.turbo !== true)))
++    throw new Error('Audio Drive requires the four-step Turbo video path.');
+   if (isSingularity(request)) return buildSingularityGraph(request, uploadedAssets, runId, options);
+   const turbo = options.turbo ?? request.turbo;
+   if (options.output === "image" || (turbo !== true && turbo !== "On")) {
+@@ -1021,9 +1025,9 @@
+     video: ["130", 0], filename_prefix: String(options.outputPrefix || `h3lix/${runId}/fused-turbo/H3LIX-H3`),
+     format: "mp4", "format.codec": "h264", "format.codec.encoding": "auto", codec: "auto",
+   } };
+-  return { ...build, graph, profile: "fused-turbo-h3", turbo: true,
++  return attachAudioDrive({ ...build, graph, profile: "fused-turbo-h3", turbo: true,
+     turboLoraStrength: undefined, spectrum: false, realism: false,
+-    performanceOptimizations: true, ezCleanVram: false, ezSigmaShift: true, ezRife: false };
++    performanceOptimizations: true, ezCleanVram: false, ezSigmaShift: true, ezRife: false }, request, uploadedAssets);
+ }
+ 
+ // Reuse conditioning, media and output wiring, then install the isolated test
+--- a/server/jobs.mjs
++++ b/server/jobs.mjs
+@@ -1,3 +1,4 @@
++import { normalizeAudioDrive, AUDIO_DRIVE } from './audio-drive.mjs';
+ import { normalizeStarlightSettings } from "./starlight.mjs";
+ import { withComfyRuntime, videoComfyUrl } from "./comfy-runtime.mjs";
+ // Direct-generation job runner: one active render at a time (Legion has one
+@@ -144,7 +145,7 @@
+ }
+ 
+ export function normalizeGenerationRequest(request, mode) {
+-  const profiledRequest = applyGenerationProfile(request);
++  const profiledRequest = applyGenerationProfile(normalizeAudioDrive({ ...request, mode }));
+   if (isSingularity(profiledRequest)) return { ...profiledRequest, mode, tier: normalizeTier(profiledRequest.tier) };
+   // All new and replayed requests use the canonical graph. Historical
+   // manifests remain readable, but stale clients cannot reactivate the
+@@ -826,6 +827,8 @@
+       cuts,
+       communicationMode: request.communicationPlan?.mode,
+       postProduction,
++      ...(request.audioDrive === AUDIO_DRIVE ? {audioDrive:AUDIO_DRIVE, modelCheckpoint:FUSED_TURBO_PROFILE.model,
++        audioSource:'Original song excerpt locked with VRGDG Audio Drive'} : {}),
+       ...singularityManifestSettings(request),
+     },
+   };
+@@ -996,6 +999,8 @@
+   job.state = "preparing";
+   job.emit("job-phase", { phase: "preparing", message: `Preparing ${mode} for MiniMax H3` });
+   const assets = await materializeAssets(request.assets, runDir, mode);
++  if (request.audioDrive === AUDIO_DRIVE && !(await hasNode('VRGDG_MiniMaxH3AudioDrive')))
++    throw new Error('VRGDG Audio Drive is not installed in the selected Turbo runtime. No render was submitted.');
+ 
+   await systemStats();
+   const useEzTurbo = ezTurboEnabled(request);
+@@ -1174,6 +1179,8 @@
+       seed: noiseSeed,
+       communicationMode: request.communicationPlan?.mode,
+       postProduction,
++      ...(request.audioDrive === AUDIO_DRIVE ? {audioDrive:AUDIO_DRIVE, modelCheckpoint:FUSED_TURBO_PROFILE.model,
++        audioSource:'Original song excerpt locked with VRGDG Audio Drive'} : {}),
+       ...singularityManifestSettings(request),
+     },
+   };
+@@ -1399,6 +1406,8 @@
+       adult: request.adult === "On" || request.adult === true ? "On" : "Off",
+       communicationMode: request.communicationPlan?.mode,
+       postProduction,
++      ...(request.audioDrive === AUDIO_DRIVE ? {audioDrive:AUDIO_DRIVE, modelCheckpoint:FUSED_TURBO_PROFILE.model,
++        audioSource:'Original song excerpt locked with VRGDG Audio Drive'} : {}),
+       ...singularityManifestSettings(request),
+     },
+   };

@@ -1,0 +1,41 @@
+{
+  "render_submissions": 0,
+  "profiles": {
+    "A": {
+      "url": "http://192.168.1.100:8194",
+      "workflow": "/srv/ai/research/h3-fused-turbo/profile/user/default/workflows/SoundVision A-B Tests/A - Helix 4 step Turbo.json",
+      "ui_nodes": 25,
+      "api_nodes": 24,
+      "running": 0,
+      "pending": 0
+    },
+    "B": {
+      "url": "http://192.168.1.100:8189",
+      "workflow": "/srv/ai/comfyui/profiles/lab/user/default/workflows/SoundVision A-B Tests/B - Singularity 8 step Turbo.json",
+      "ui_nodes": 26,
+      "api_nodes": 25,
+      "running": 0,
+      "pending": 0
+    }
+  },
+  "inputs": {
+    "A": {
+      "SV-AB-scene08-reference-1.png": "ec72f89f5687c57bf37f22589aa40c87ce92e123e6c4f8dbe6ede529424ab6d8",
+      "SV-AB-scene08-reference-2.png": "bfab4c2e094cd004e28ae53ce340ebbaed1243ce2f2b32e092261909652f5238",
+      "SV-AB-scene08-vocal.wav": "988918b852d7cec67d7a49a2ea41c9c0ef69c49711abe13b962fe38cdd4eebf8"
+    },
+    "B": {
+      "SV-AB-scene08-reference-1.png": "ec72f89f5687c57bf37f22589aa40c87ce92e123e6c4f8dbe6ede529424ab6d8",
+      "SV-AB-scene08-reference-2.png": "bfab4c2e094cd004e28ae53ce340ebbaed1243ce2f2b32e092261909652f5238",
+      "SV-AB-scene08-vocal.wav": "988918b852d7cec67d7a49a2ea41c9c0ef69c49711abe13b962fe38cdd4eebf8"
+    }
+  },
+  "checks": [
+    "Native API import, save and reload on each target runtime",
+    "Exported graph inputs match prepared profiles exactly",
+    "No frontend node or asset errors",
+    "Fixed after-generate seed controls",
+    "Live node classes, model and media choices, numeric bounds, links and acyclic graph",
+    "Identical source media bytes on both profiles"
+  ]
+}

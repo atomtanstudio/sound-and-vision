@@ -1,0 +1,13 @@
+{
+  "source": {"repo": "https://github.com/multimodal-art-projection/YuE", "revision": "92a73cc7652fcc1f937855e4b765e0a0edd7ff2e", "package": "yue2-infer==0.1.6"},
+  "models": {
+    "generator": {"repo": "m-a-p/YuE2-3B", "revision": "1a96eca688d6ae5d7f0feb88573fec89920fcd19"},
+    "decoder": {"repo": "m-a-p/YuE2-Vae", "revision": "95535e72a97bc0f09b8ada125d26b4009428c0e8"}
+  },
+  "python": "3.12",
+  "torch": "2.10.0",
+  "backend": "torch",
+  "quantization": "none",
+  "memory_budget_gib": 24,
+  "weight_license": "CC-BY-NC-4.0"
+}

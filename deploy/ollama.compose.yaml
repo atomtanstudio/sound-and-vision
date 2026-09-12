@@ -1,0 +1,16 @@
+# Optional local writing server. No GPU is assigned; music keeps its VRAM.
+services:
+  ollama:
+    image: ollama/ollama@sha256:684d8674b4315fa18f4f0e973a118ec2652ed96f67563277839985175858e0ba
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    cpus: 8
+    mem_limit: 12g
+    environment:
+      OLLAMA_KEEP_ALIVE: "0"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - soundvision-writing-models:/root/.ollama
+volumes:
+  soundvision-writing-models:

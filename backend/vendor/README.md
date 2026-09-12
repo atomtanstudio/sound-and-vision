@@ -1,0 +1,1 @@
+YuE2 ABC structural helper and example melody, copied unchanged from source revision `92a73cc7652fcc1f937855e4b765e0a0edd7ff2e`. Paths: `skills/yue2-music/scripts/abc_tools.py` and `examples/melody.abc`. Apache-2.0 license retained in `LICENSE.YuE2`. This helper supports the bounded native two-voice dialect; it is not a general ABC parser or an audio-quality validator.

@@ -1,0 +1,21 @@
+[Unit]
+Description=Sound/Vision Legion visualizer video renderer
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/ai/sound-vision-renderer
+Environment=SOUND_VISION_TOKEN_FILE=/srv/ai/sound-vision/service.token
+Environment=PLAYWRIGHT_EXECUTABLE_PATH=/home/richgates/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome
+Environment=SOUND_VISION_VIDEO_ENCODER=h264_nvenc
+Environment=SOUND_VISION_REQUIRE_GPU=1
+ExecStart=/srv/ai/sound-vision/bin/node scripts/video/visualizer-export-server.mjs
+Restart=on-failure
+RestartSec=4
+KillMode=control-group
+TimeoutStopSec=25
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

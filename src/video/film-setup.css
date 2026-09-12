@@ -1,0 +1,79 @@
+.film-setup { display:grid; gap:28px; max-width:1000px; margin:0 auto; padding:4px 0 32px; }
+.film-workflow-steps { display:flex; list-style:none; padding:0 0 22px; margin:0; gap:28px; border-bottom:1px solid var(--border); color:var(--muted); font-size:12px; flex-wrap:wrap; }
+.film-workflow-steps li { display:flex; align-items:center; gap:9px; }
+.film-workflow-steps li[aria-current] { color:var(--ink); font-weight:650; }
+.film-workflow-steps li>span { width:25px; height:25px; border:1px solid var(--border); border-radius:50%; display:grid; place-items:center; }
+.film-workflow-steps li[aria-current]>span { background:var(--accent,#e38c78); color:#211d1b; border-color:transparent; }
+.film-setup-heading h2 { font-size:27px; letter-spacing:-.6px; }
+.film-format-choice { border:0; padding:0; margin:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.film-format-choice legend { margin-bottom:12px; font-size:13px; font-weight:650; }
+.film-format-choice button { appearance:none; display:grid; grid-template-columns:auto 1fr; text-align:left; gap:8px 11px; padding:18px; background:var(--panel); color:var(--ink); border:1px solid var(--border); border-radius:10px; font:inherit; cursor:pointer; }
+.film-format-choice button.selected { border-color:var(--accent,#e38c78); background:color-mix(in srgb,var(--accent,#e38c78) 8%,var(--panel)); }
+.film-format-choice button>span { grid-column:1/-1; color:var(--muted); font-size:12px; line-height:1.6; }
+.film-format-choice button strong { font-size:13px; }
+.film-format-choice button:focus-visible { outline:2px solid var(--accent,#e38c78); outline-offset:3px; }
+.film-idea-section,.film-treatment-section { border:1px solid var(--border); border-radius:12px; padding:24px; background:var(--panel); }
+.film-section-heading { display:flex; justify-content:space-between; gap:12px; align-items:baseline; margin-bottom:13px; }
+.film-section-heading h3 { margin:0; font-size:16px; }
+.film-section-heading>span { font-size:11px; color:var(--muted); }
+.film-setup textarea { font-size:13px; line-height:1.65; }
+.film-setup label>span>small { font-weight:400; color:var(--muted); margin-left:6px; }
+.film-setup details { padding-top:18px; }
+.film-setup summary { cursor:pointer; font-size:13px; color:var(--ink); margin-bottom:12px; }
+.film-creative-choices>summary,.film-production-options>summary { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.film-creative-choices>summary>span { color:var(--muted); font-size:11px; font-weight:400; }
+.film-control-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.film-concept-actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:18px; }
+.film-concept-actions p { flex-basis:100%; font-size:11px; }
+.film-concept-fields { display:grid; gap:18px; }
+.film-concept-people>label { margin-top:14px; }
+.film-story-arc { display:grid; gap:18px; margin-top:8px; }
+.film-story-beat { display:grid; grid-template-columns:27px minmax(0,1fr); gap:13px; }
+.film-beat-number { color:var(--accent,#e38c78); border:1px solid var(--border); border-radius:50%; width:26px; height:26px; display:grid; place-items:center; font-size:11px; }
+.film-story-beat label>span { font-weight:650; color:var(--ink); }
+.film-production-options { border-top:1px solid var(--border); padding-top:20px; }
+.film-production-options .film-control-grid { margin:16px 0 24px; }
+.film-storyboard-submit { display:grid; grid-template-columns:minmax(180px,.7fr) minmax(0,1.3fr); gap:20px; align-items:end; padding-top:22px; border-top:1px solid var(--border); }
+.film-storyboard-submit button { white-space:normal; }
+.film-storyboard-submit p { margin-top:10px; font-size:11px; }
+.film-setup button:disabled { opacity:.5; cursor:not-allowed; }
+.film-storyboard-intro { border:1px solid var(--border); background:var(--panel); padding:20px; margin-bottom:24px; border-radius:10px; }
+.film-storyboard-intro>summary { cursor:pointer; font-size:15px; font-weight:650; }
+.film-storyboard-intro .film-concept-fields { margin-top:22px; }
+.film-board-image { width:100%; aspect-ratio:16/9; object-fit:contain; background:#101014; border-radius:6px; margin:14px 0 8px; }
+.film-frame-actions { display:grid; gap:12px; }
+.film-frame-actions>button { justify-self:start; }
+.film-frame-status { border:1px solid var(--border); border-radius:8px; padding:14px; background:var(--panel); }
+.film-frame-status-heading { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px 16px; font-size:12px; }
+.film-frame-status-heading>span:first-child { display:flex; align-items:center; gap:7px; }
+.film-frame-status-heading>[role=timer] { color:var(--muted); font-variant-numeric:tabular-nums; }
+.film-frame-status.is-queued,.film-frame-status.is-running,.film-frame-status.is-waiting-for-resource { border-color:var(--accent,#e38c78); }
+.film-frame-status.is-ready .film-frame-status-heading { color:var(--ink); }
+.film-frame-status.is-failed { border-color:#ca655b; }
+.film-frame-status p { margin:8px 0 0!important; font-size:12px; overflow-wrap:anywhere; }
+.film-frame-status>button { margin-top:12px; }
+.film-scene-purpose { margin-top:10px!important; }
+.film-scene-purpose strong { color:var(--ink); font-weight:550; }
+.film-scene-plan { margin-top:16px; }
+.film-scene-plan summary { font-size:12px; cursor:pointer; margin-bottom:12px; }
+.film-scene-plan>div { display:grid; gap:12px; }
+.film-scene-plan textarea { min-height:70px; }
+.film-scene-plan .secondary-button { justify-self:start; }
+.directed-board.film-illustrated-board { grid-template-columns:minmax(180px,220px) minmax(0,1fr); }
+.film-illustrated-board .directed-scenes { grid-template-columns:minmax(0,1fr); }
+.modal.storyboard-rerender { width:min(900px,94vw); max-width:900px; }
+.storyboard-rerender .modal-body { display:grid; gap:18px; }
+.storyboard-rerender textarea { width:100%; max-height:45vh; font-size:13px; line-height:1.6; }
+.storyboard-rerender-intro { display:flex; align-items:start; gap:18px; }
+.storyboard-rerender-intro img { width:180px; aspect-ratio:16/9; object-fit:contain; border-radius:7px; }
+.storyboard-rerender-intro h3 { margin-top:0; }
+.storyboard-rerender-actions { display:flex; justify-content:flex-end; gap:12px; }
+@media(max-width:700px) {
+  .storyboard-rerender-intro { flex-direction:column; }
+  .directed-board.film-illustrated-board { grid-template-columns:minmax(0,1fr); }
+  .film-format-choice,.film-control-grid,.film-storyboard-submit { grid-template-columns:1fr; }
+  .film-workflow-steps { gap:12px; font-size:11px; }
+  .film-idea-section,.film-treatment-section { padding:18px; }
+  .film-section-heading { flex-wrap:wrap; }
+  .film-setup-heading h2 { font-size:23px; }
+}

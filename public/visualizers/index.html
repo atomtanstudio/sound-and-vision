@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Visualizers — Sound/Vision</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #111114;
+        color: #e6e3df;
+        font:
+          14px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 1280px;
+        margin: auto;
+        padding: 26px 28px 40px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      h1 {
+        font-size: 19px;
+        margin: 0;
+        font-weight: 550;
+        letter-spacing: -0.5px;
+      }
+      .sub {
+        color: #88878c;
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      .badge {
+        font-size: 11px;
+        color: #a19da6;
+      }
+      .stage {
+        width: min(100%, calc((100dvh - 315px) * 16 / 9));
+        min-width: 220px;
+        aspect-ratio: 16/9;
+        position: relative;
+        margin: auto;
+        border: 1px solid #303036;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #08080b;
+      }
+      .stage.portrait {
+        aspect-ratio: 9/16;
+        width: min(100%, calc((100dvh - 315px) * 9 / 16));
+      }
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .overlay {
+        position: absolute;
+        left: 24px;
+        bottom: 20px;
+        pointer-events: none;
+        text-shadow: 0 2px 16px #000;
+      }
+      #name {
+        font-size: 19px;
+        font-weight: 500;
+      }
+      #description {
+        font-size: 11px;
+        color: #d0cacf;
+      }
+      .tools {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin: 18px 0 14px;
+      }
+      button,
+      .file {
+        border: 1px solid #39363e;
+        border-radius: 5px;
+        padding: 8px 12px;
+        background: #222126;
+        color: #ebe8e4;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover,
+      .file:hover {
+        background: #313039;
+      }
+      button[aria-pressed="true"] {
+        border-color: #b09c83;
+        background: #39312b;
+      }
+      .file input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+      }
+      .file:focus-within {
+        outline: 2px solid #c5b097;
+        outline-offset: 3px;
+      }
+      .tools label {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .tools input[type="range"] {
+        width: 90px;
+        accent-color: #b7a38b;
+      }
+      .tools small {
+        color: #99959e;
+      }
+      #meter {
+        width: 44px;
+        height: 4px;
+        overflow: hidden;
+        background: #343038;
+        border-radius: 2px;
+      }
+      #meter i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: #d8b887;
+      }
+      audio {
+        height: 32px;
+        max-width: 330px;
+        flex: 1;
+        min-width: 200px;
+      }
+      #presets {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 8px;
+      }
+      #presets button {
+        text-align: left;
+        padding: 0;
+        overflow: hidden;
+        background: #19191d;
+      }
+      #presets img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16/9;
+        object-fit: cover;
+        opacity: 0.82;
+      }
+      #presets span {
+        display: block;
+        padding: 7px 9px;
+        font-size: 11px;
+      }
+      #presets button[aria-pressed="true"] img {
+        opacity: 1;
+      }
+      footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: #8f8a95;
+        font-size: 11px;
+        margin-top: 15px;
+      }
+      #error {
+        color: #ffc1b5;
+        font-size: 12px;
+      }
+      #status {
+        color: #aaa5af;
+        font-size: 11px;
+      }
+      input[type="checkbox"] {
+        accent-color: #c5b097;
+      }
+      @media (max-width: 750px) {
+        main {
+          padding: 15px;
+        }
+        #presets {
+          grid-template-columns: repeat(4, 1fr);
+        }
+        .stage {
+          width: 100%;
+          min-width: 0;
+        }
+        .stage.portrait {
+          width: min(100%, calc((100dvh - 340px) * 9 / 16));
+        }
+        .tools {
+          gap: 9px;
+        }
+        .badge {
+          display: none;
+        }
+        footer {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>
+            <a href="/video">Sound/Vision</a>
+            <span style="color: #716c77; font-weight: 400">/ Visualizers</span>
+          </h1>
+          <div class="sub">
+            Eight original studies. Choose a song and a scene.
+          </div>
+        </div>
+        <div class="badge">Original code · Apache-2.0</div>
+      </header>
+      <section id="stage" class="stage">
+        <canvas id="canvas"></canvas>
+        <div class="overlay">
+          <div id="name">Vault</div>
+          <div id="description">Sculptural perspective tunnel</div>
+        </div>
+      </section>
+      <div class="tools">
+        <label class="file"
+          >Load a song<input id="file" type="file" accept="audio/*" /></label
+        ><button id="demo">Forwarding Address</button
+        ><button id="test">Test rhythm</button>
+        <audio id="audio" controls hidden></audio
+        ><label
+          >Strength
+          <input
+            id="strength"
+            type="range"
+            min="0"
+            max="200"
+            value="100"
+          /><small id="strength-value">100%</small></label
+        >
+        <label><input id="cycle" type="checkbox" checked /> Cycle</label
+        ><button id="aspect">9:16</button>
+        <div id="meter"><i></i></div>
+      </div>
+      <div id="presets"></div>
+      <p id="error" hidden></p>
+      <footer>
+        <span id="status">Choose a song, or try the diagnostic rhythm.</span
+        ><a href="./collection.frag" download>Download shader source ↗</a>
+      </footer>
+    </main>
+    <script type="module" src="./preview.js"></script>
+  </body>
+</html>

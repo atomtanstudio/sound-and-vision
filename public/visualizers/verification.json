@@ -1,0 +1,91 @@
+{
+  "renderer": "Renderer: Apple M5 Max; 4.1 Metal - 90.5",
+  "resolution": [
+    320,
+    180
+  ],
+  "allCompiled": true,
+  "allRendered": true,
+  "results": [
+    {
+      "preset": 0,
+      "deterministic": true,
+      "meanAudioPixelDifference": 7.43,
+      "range": [
+        0,
+        157
+      ],
+      "sha256": "11afb4989ed2afbfe8576c96131dc8dda1fa432f92c08f791e8a163723dd73c1"
+    },
+    {
+      "preset": 1,
+      "deterministic": true,
+      "meanAudioPixelDifference": 33.429,
+      "range": [
+        5,
+        183
+      ],
+      "sha256": "5bc4b3b205f2ad67a502200bc184ce4d4a0f1ae3b559bbd822add00dfe7a63be"
+    },
+    {
+      "preset": 2,
+      "deterministic": true,
+      "meanAudioPixelDifference": 11.915,
+      "range": [
+        5,
+        178
+      ],
+      "sha256": "1745d5273430108cfbc2a3d173f76a8edc210a9ce0554c1b946f72468d900e94"
+    },
+    {
+      "preset": 3,
+      "deterministic": true,
+      "meanAudioPixelDifference": 14.895,
+      "range": [
+        10,
+        131
+      ],
+      "sha256": "46567b5dc3eaa2ba5b04122c980b75191b7dfbef7eda8b834d3e4781e58b346a"
+    },
+    {
+      "preset": 4,
+      "deterministic": true,
+      "meanAudioPixelDifference": 13.593,
+      "range": [
+        9,
+        122
+      ],
+      "sha256": "e1b77b0245085cdc71129e225071050a70acb0bbef9c9a152b51a60fe9d0dd10"
+    },
+    {
+      "preset": 5,
+      "deterministic": true,
+      "meanAudioPixelDifference": 21.109,
+      "range": [
+        6,
+        117
+      ],
+      "sha256": "51ee224ceb666962ae165784020cb79d78bc069903ec7f004a698ad64047f3b9"
+    },
+    {
+      "preset": 6,
+      "deterministic": true,
+      "meanAudioPixelDifference": 5.569,
+      "range": [
+        6,
+        224
+      ],
+      "sha256": "55319c6e59819e28faa2c9ba4fcb0fd260f1c130e18693c88ded404a33408f0c"
+    },
+    {
+      "preset": 7,
+      "deterministic": true,
+      "meanAudioPixelDifference": 11.203,
+      "range": [
+        0,
+        134
+      ],
+      "sha256": "e9d06859d23171ff25716994922af20eeccb86a1cd2444694f2bb63d178f5625"
+    }
+  ]
+}

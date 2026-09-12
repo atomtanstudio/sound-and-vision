@@ -1,0 +1,16 @@
+{
+  "SheetSage2": {
+    "repository": "https://huggingface.co/m-a-p/SheetSage2",
+    "revision": "eab522a8168e8b8b8c4856bf8609cd86198f01fe"
+  },
+  "MERT-v2-FullSong": {
+    "repository": "https://huggingface.co/m-a-p/MERT-v2-FullSong",
+    "revision": "d8ba1c745e733b3908ce6ad16ebeb17ac7600a42"
+  },
+  "demoReuseReview": {
+    "date": "2026-09-10",
+    "repository": "https://github.com/map-yue2/map-yue2.github.io",
+    "tree": "48886e497ffc7ab05a815d815bd1d95723b9bdee",
+    "finding": "No root license or explicit permission to redistribute demo recordings found in the repository README or demo page. Vendor asset licenses do not grant demo audio reuse. No recordings imported and no external demo links added to the interface."
+  }
+}

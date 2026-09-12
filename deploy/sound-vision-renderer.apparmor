@@ -1,0 +1,8 @@
+# Allow this Chromium executable to create its own browser sandbox, matching
+# Ubuntu's packaged Chrome policy. Global user-namespace restrictions stay on.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile sound-vision-renderer-chrome /home/richgates/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome flags=(unconfined) {
+  userns,
+}

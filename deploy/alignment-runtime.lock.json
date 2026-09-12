@@ -1,0 +1,18 @@
+{
+  "repo": "Systran/faster-whisper-large-v3",
+  "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+  "path": "/srv/ai/sound-vision/alignment-models/huggingface/models--Systran--faster-whisper-large-v3/snapshots/edaa852ec7e145841d8ffdb056a99866b5f0a478",
+  "demucs": "htdemucs",
+  "demucsFiles": {
+    "/srv/ai/sound-vision/alignment-models/torch/hub/checkpoints/955717e8-8726e21a.th": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4"
+  },
+  "device": "cpu",
+  "computeType": "int8",
+  "stableTs": "2.19.1",
+  "fasterWhisper": "1.2.1",
+  "englishCTC": "WAV2VEC2_ASR_LARGE_LV60K_960H",
+  "checkpointHashes": {
+    "/srv/ai/sound-vision/alignment-models/torch/hub/checkpoints/wav2vec2_fairseq_large_lv60k_asr_ls960.pth": "7a88965716fbd598a595209bf45c1210a18a6935cfb0cf53527fc986c5543ac7",
+    "/srv/ai/sound-vision/alignment-models/torch/hub/checkpoints/955717e8-8726e21a.th": "8726e21a993978c7ba086d3872e7608d7d5bfca646ca4aca459ffda844faa8b4"
+  }
+}

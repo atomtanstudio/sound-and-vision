@@ -1,0 +1,76 @@
+.film-credits-editor {
+  display: grid;
+  gap: 14px;
+}
+.film-credits-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+}
+.film-credits-toggle input {
+  width: 16px !important;
+  min-height: 16px !important;
+  accent-color: var(--accent);
+}
+.film-credits-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.film-credits-fields label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.film-credits-fields input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 8px 10px;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font: inherit;
+}
+.film-credits-preview {
+  position: relative;
+  width: min(100%, 640px);
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #202127;
+  background-size: cover;
+  background-position: center;
+}
+.film-credits-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.film-credits-preview > span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #b9bac4;
+  font-size: 12px;
+}
+.film-credits-settings {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.film-credits-settings summary {
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.film-credits-settings .secondary-button {
+  margin-top: 14px;
+}
+@media (max-width: 720px) {
+  .film-credits-fields {
+    grid-template-columns: 1fr;
+  }
+}

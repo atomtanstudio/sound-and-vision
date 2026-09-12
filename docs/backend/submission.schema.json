@@ -1,0 +1,210 @@
+{
+  "$defs": {
+    "Sampling": {
+      "additionalProperties": false,
+      "properties": {
+        "temperature": {
+          "default": 1,
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Temperature",
+          "type": "number"
+        },
+        "top_p": {
+          "default": 0.95,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Top P",
+          "type": "number"
+        },
+        "top_k": {
+          "default": 100,
+          "maximum": 184704,
+          "minimum": 1,
+          "title": "Top K",
+          "type": "integer"
+        },
+        "repetition_penalty": {
+          "default": 1.2,
+          "exclusiveMinimum": 0,
+          "title": "Repetition Penalty",
+          "type": "number"
+        },
+        "penalty_window": {
+          "default": 50,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Penalty Window",
+          "type": "integer"
+        },
+        "min_tokens": {
+          "default": 200,
+          "minimum": 0,
+          "title": "Min Tokens",
+          "type": "integer"
+        },
+        "max_tokens": {
+          "default": 9000,
+          "maximum": 24576,
+          "minimum": 1,
+          "title": "Max Tokens",
+          "type": "integer"
+        }
+      },
+      "title": "Sampling",
+      "type": "object"
+    },
+    "SongForm": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 20000,
+          "title": "Description",
+          "type": "string"
+        },
+        "title": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Title",
+          "type": "string"
+        },
+        "lyrics": {
+          "default": "",
+          "maxLength": 100000,
+          "title": "Lyrics",
+          "type": "string"
+        },
+        "style": {
+          "default": "",
+          "maxLength": 20000,
+          "title": "Style",
+          "type": "string"
+        },
+        "count": {
+          "default": 2,
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Count",
+          "type": "integer"
+        },
+        "project": {
+          "default": "Loose tracks",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Project",
+          "type": "string"
+        },
+        "cot": {
+          "default": "full",
+          "enum": [
+            "full",
+            "melody",
+            "off"
+          ],
+          "title": "Cot",
+          "type": "string"
+        },
+        "abc": {
+          "default": "",
+          "maxLength": 100000,
+          "title": "Abc",
+          "type": "string"
+        },
+        "seed": {
+          "default": "",
+          "title": "Seed",
+          "type": "string"
+        },
+        "cfg_scale": {
+          "default": "",
+          "title": "Cfg Scale",
+          "type": "string"
+        },
+        "planFirst": {
+          "default": false,
+          "title": "Planfirst",
+          "type": "boolean"
+        },
+        "ode_steps": {
+          "default": 32,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Ode Steps",
+          "type": "integer"
+        },
+        "semantic": {
+          "$ref": "#/$defs/Sampling"
+        },
+        "score": {
+          "$ref": "#/$defs/Sampling"
+        },
+        "genre": {
+          "default": "",
+          "maxLength": 80,
+          "title": "Genre",
+          "type": "string"
+        },
+        "referenceId": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Referenceid"
+        },
+        "sourceTakeId": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sourcetakeid"
+        },
+        "writingTask": {
+          "default": "Draft lyrics",
+          "maxLength": 100,
+          "title": "Writingtask",
+          "type": "string"
+        },
+        "writingPrompt": {
+          "default": "",
+          "maxLength": 20000,
+          "title": "Writingprompt",
+          "type": "string"
+        }
+      },
+      "title": "SongForm",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "requestId": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{7,99}$",
+      "title": "Requestid",
+      "type": "string"
+    },
+    "form": {
+      "$ref": "#/$defs/SongForm"
+    }
+  },
+  "required": [
+    "requestId",
+    "form"
+  ],
+  "title": "GenerationSubmission",
+  "type": "object"
+}

@@ -1,0 +1,7 @@
+# YuE2 is installed separately from the exact Git revision in deploy/source.lock.json.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.35.0
+httpx==0.28.1
+pytest==9.0.3
+Pillow==12.3.0
