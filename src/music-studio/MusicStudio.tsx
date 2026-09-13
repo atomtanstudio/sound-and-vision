@@ -10,6 +10,7 @@ import {
 import { musicApi, type BackendStatus } from "./api";
 import { useLibrarySelection } from "./selection";
 import { VideoWorkspace } from "../video/VideoWorkspace";
+import { MediaLibrary } from "./MediaLibrary";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Home,
@@ -17,6 +18,7 @@ import {
   PanelLeftOpen,
   Music2,
   Clapperboard,
+  LibraryBig,
   Sun,
   Moon,
   Search,
@@ -54,11 +56,13 @@ import {
   generationRequest,
   initialForm,
   initialTracks,
+  uniqueTracks,
   projects,
   readLocal,
   validate,
   writeLocal,
   type Page,
+  pageFromPath,
   type Sampling,
   type SongForm,
   type Track,
@@ -251,15 +255,9 @@ function SamplingFields({
   );
 }
 export function MusicStudio() {
-  const [page, setPage] = useState<Page>(() =>
-    location.pathname === "/home"
-      ? "home"
-      : location.pathname === "/video"
-        ? "video"
-        : "music",
-  );
+  const [page, setPage] = useState<Page>(() => pageFromPath(location.pathname));
   useEffect(() => {
-    document.title = `Sound/Vision — ${page === "home" ? "Home" : page === "video" ? "Video" : "Music"}`;
+    document.title = `Sound/Vision — ${page[0].toUpperCase() + page.slice(1)}`;
   }, [page]);
   const [mode, setMode] = useState<"simple" | "advanced">("simple");
   const [writingRequest, setWritingRequest] = useState(0);
@@ -324,7 +322,7 @@ export function MusicStudio() {
     ...readLocal<Partial<SongForm>>("sv-form-v2", {}),
   }));
   const [tracks, setTracks] = useState<Track[]>(() =>
-    readLocal("sv-library-v2", initialTracks),
+    uniqueTracks(readLocal("sv-library-v2", initialTracks)),
   );
   const [backend, setBackend] = useState<BackendStatus | null>(null);
   const backendSeen = useRef(false);
@@ -362,10 +360,12 @@ export function MusicStudio() {
           return;
         backendSeen.current = true;
         setBackend(status);
-        setTracks((previous) => [
-          ...library.tracks,
-          ...previous.filter((t) => !t.source),
-        ]);
+        setTracks((previous) =>
+          uniqueTracks([
+            ...library.tracks,
+            ...previous.filter((t) => !t.source),
+          ]),
+        );
         setDetail((previous) => {
           const fresh = library.tracks.find((t) => t.id === previous?.id);
           return previous && fresh
@@ -531,14 +531,7 @@ export function MusicStudio() {
     return () => clearTimeout(t);
   }, [notice]);
   useEffect(() => {
-    const pop = () =>
-      setPage(
-        location.pathname === "/home"
-          ? "home"
-          : location.pathname === "/video"
-            ? "video"
-            : "music",
-      );
+    const pop = () => setPage(pageFromPath(location.pathname));
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
   }, []);
@@ -1074,6 +1067,7 @@ export function MusicStudio() {
               { id: "home", label: "Home", icon: Home },
               { id: "music", label: "Music", icon: Music2 },
               { id: "video", label: "Video", icon: Clapperboard },
+              { id: "library", label: "Library", icon: LibraryBig },
             ] as const
           ).map((item) => (
             <button
@@ -1123,14 +1117,16 @@ export function MusicStudio() {
       <div className="workspace-body" inert={compactViewport && mobileRailOpen}>
         <header className="topbar">
           <div className="breadcrumb">
-            {page === "home" ? "Home" : page === "music" ? "Music" : "Video"}
+            {page[0].toUpperCase() + page.slice(1)}
             <ChevronRight size={14} />
             <span>
               {page === "home"
                 ? "Your library"
                 : page === "music"
                   ? "Create"
-                  : "New video"}
+                  : page === "library"
+                    ? "Songs and videos"
+                    : "New video"}
             </span>
           </div>
           <div className="topbar-right">
@@ -1661,6 +1657,40 @@ export function MusicStudio() {
                   ))}
                 </div>
               </>
+            ) : page === "library" ? (
+              <MediaLibrary
+                tracks={tracks}
+                currentId={current}
+                playing={playing}
+                play={listen}
+                pauseMusic={() => audio.current?.pause()}
+                openVideo={(takeId, kind, filmId) => {
+                  if (takeId) {
+                    setVideoSource(takeId);
+                    if (kind) {
+                      const key = `sv-video-draft-v1:${takeId}`;
+                      writeLocal(key, {
+                        version: 1,
+                        motionVersion: 2,
+                        ...readLocal<Record<string, unknown>>(key, {}),
+                        kind:
+                          kind === "visualizer"
+                            ? "visualizer"
+                            : kind === "film"
+                              ? "directed"
+                              : "cinematic",
+                      });
+                    }
+                  }
+                  navigate("video");
+                  if (filmId)
+                    window.history.replaceState(
+                      null,
+                      "",
+                      `/video?film=${encodeURIComponent(filmId)}`,
+                    );
+                }}
+              />
             ) : page === "video" ? (
               <VideoWorkspace
                 imported={(track) => {

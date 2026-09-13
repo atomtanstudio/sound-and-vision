@@ -4,6 +4,7 @@ import {
   useState,
   type CSSProperties,
   type RefObject,
+  type ReactNode,
 } from "react";
 import {
   Type,
@@ -24,7 +25,6 @@ import {
   X,
   MoveLeft,
   MoveRight,
-  Music2,
 } from "lucide-react";
 import { readLocal, writeLocal, type Track } from "../music-studio/model";
 import {
@@ -32,6 +32,8 @@ import {
   makeDraft,
   makePlacements,
   alignedCues,
+  lyricRenderCues,
+  currentLyricAlignment,
   cueAt,
   placementAt,
   timeLabel,
@@ -48,9 +50,11 @@ import {
   type ImportedAsset,
 } from "./assets";
 import "./video.css";
+import { MusicVideoCreator } from "./MusicVideoCreator";
+import { LyricPreparation } from "./LyricPreparation";
 import { useVideoProduction, busyJob, type Alignment } from "./production";
 import { wordMotion } from "./kinetics";
-import { WordTimingEditor } from "./WordTimingEditor";
+import { LyricTimelineEditor } from "./LyricTimelineEditor";
 import { VisualizerCanvas } from "./visualizers/VisualizerCanvas";
 import { LyricOverlay } from "./visualizers/LyricOverlay";
 import { VisualizerExports } from "./visualizers/VisualizerExports";
@@ -90,6 +94,12 @@ const musicVideoAvailable = import.meta.env.VITE_ENABLE_MUSIC_VIDEO === "true";
 
 const options = [
   {
+    id: "cinematic",
+    title: "Music video",
+    note: "Full-song scenes with optional lyrics",
+    icon: Film,
+  },
+  {
     id: "kinetic",
     title: "Kinetic lyric video",
     note: "Animated words over images or clips",
@@ -103,7 +113,7 @@ const options = [
   },
   {
     id: "directed",
-    title: "Music video",
+    title: "Lip-sync music video",
     note: musicVideoAvailable
       ? "A treatment, storyboard and scenes"
       : "Coming soon",
@@ -114,12 +124,15 @@ const options = [
 export function VideoWorkspace(props: Props) {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
+  const songInput = useRef<HTMLInputElement>(null);
+  const [importName, setImportName] = useState("");
   async function importSong(file?: File) {
     if (!file || importing) return;
     if (file.size > 100 * 1024 * 1024) {
       setImportError("Choose a song smaller than 100 MB.");
       return;
     }
+    setImportName(file.name);
     setImporting(true);
     setImportError("");
     try {
@@ -143,11 +156,64 @@ export function VideoWorkspace(props: Props) {
       setImporting(false);
     }
   }
-  const importer = (
-    <div className="song-import-bar">
-      <label className="secondary-button">
-        {importing ? "Importing song…" : "Import song"}
+  const tracks = props.tracks.filter(playable);
+  const track = tracks.find((t) => t.id === props.sourceId) || tracks[0];
+  const sourcePanel = (
+    <section
+      className="video-source-panel"
+      aria-labelledby="video-source-title"
+      aria-busy={importing}
+    >
+      <div className="video-section-heading">
+        <div>
+          <h2 id="video-source-title">Soundtrack</h2>
+          <p>Choose a song from your library or bring your own audio.</p>
+        </div>
+        {track && (
+          <span className="video-source-duration">
+            {timeLabel(length(track))} ·{" "}
+            {track.source === "imported" ? "Imported song" : "Library song"}
+          </span>
+        )}
+      </div>
+      <div className="video-source-controls">
+        {track && (
+          <label className="video-source-select">
+            <span className="sr-only">Soundtrack</span>
+            <select
+              aria-label="Soundtrack"
+              value={track.id}
+              disabled={importing}
+              onChange={(e) => props.chooseSource(e.target.value)}
+            >
+              {tracks.map((item) => (
+                <option value={item.id} key={item.id}>
+                  {item.title} ·{" "}
+                  {item.source === "imported"
+                    ? "Imported song"
+                    : item.source === "yue2"
+                      ? `Take ${item.take || 1}`
+                      : item.audio === 1
+                        ? "Amber take"
+                        : "Dusk take"}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {track && <span className="video-source-or">or</span>}
+        <button
+          className={track ? "secondary-button" : "primary-button"}
+          disabled={importing}
+          onClick={() => songInput.current?.click()}
+        >
+          <Upload size={16} />
+          {importing ? "Importing song…" : "Import song"}
+        </button>
         <input
+          ref={songInput}
+          hidden
+          tabIndex={-1}
           aria-label="Import song"
           type="file"
           accept=".wav,.flac,.mp3,.m4a,.ogg"
@@ -157,30 +223,40 @@ export function VideoWorkspace(props: Props) {
             e.target.value = "";
           }}
         />
-      </label>
-      <span>
-        Use your own audio · WAV, FLAC, MP3, M4A, OGG · up to 100 MB / 10
-        minutes
-      </span>
-      {importError && <p role="alert">{importError}</p>}
-    </div>
+      </div>
+      <p className="video-field-note">
+        WAV, FLAC, MP3, M4A or OGG · up to 100 MB · 1 second–10 minutes
+      </p>
+      {importing && (
+        <p className="video-import-status" role="status">
+          Uploading and preparing {importName}. Your song will be selected when
+          it is ready.
+        </p>
+      )}
+      {importError && (
+        <p className="form-error" role="alert">
+          {importError}
+        </p>
+      )}
+    </section>
   );
-  const tracks = props.tracks.filter(playable);
-  const track = tracks.find((t) => t.id === props.sourceId) || tracks[0];
   if (!track)
     return (
       <div className="video-empty">
         <Clapperboard size={32} />
         <h1>Make a video</h1>
         <p>Import an existing song or choose a finished song from Music.</p>
-        {importer}
+        {sourcePanel}
       </div>
     );
   return (
-    <>
-      <div>{importer}</div>
-      <VideoEditor key={track.id} {...props} tracks={tracks} track={track} />
-    </>
+    <VideoEditor
+      key={track.id}
+      {...props}
+      tracks={tracks}
+      track={track}
+      sourcePanel={sourcePanel}
+    />
   );
 }
 function restoreDraft(track: Track): VideoDraft {
@@ -203,7 +279,9 @@ function restoreDraft(track: Track): VideoDraft {
   draft.imageCycles = Math.max(1, Math.min(8, Math.round(draft.imageCycles)));
   draft.clipCount = Math.max(1, Math.min(24, Math.round(draft.clipCount)));
   draft.clipSeconds = Math.max(4, Math.min(15, draft.clipSeconds));
-  draft.kind = ["kinetic", "visualizer", "directed"].includes(draft.kind)
+  draft.kind = ["kinetic", "visualizer", "directed", "cinematic"].includes(
+    draft.kind,
+  )
     ? draft.kind
     : base.kind;
   draft.aspect = draft.aspect === "9:16" ? "9:16" : "16:9";
@@ -231,6 +309,7 @@ function restoreDraft(track: Track): VideoDraft {
   return draft;
 }
 function VideoEditor({
+  sourcePanel,
   track,
   tracks,
   sourceId,
@@ -241,7 +320,7 @@ function VideoEditor({
   audioRef,
   play,
   seek,
-}: Props & { track: Track }) {
+}: Props & { track: Track; sourcePanel: ReactNode }) {
   const [draft, setDraft] = useState(() => {
     const restored = restoreDraft(track);
     if (new URLSearchParams(location.search).has("film"))
@@ -258,25 +337,10 @@ function VideoEditor({
         j.input.lyrics.trim() === draft.lyrics.trim() &&
         j.input.language === draft.language,
     );
-  const alignment = alignmentJob?.result as Alignment | undefined;
-  const alignmentBusy = production.jobs.some(
-    (j) => j.kind === "lyric-alignment" && busyJob(j),
+  const alignment = currentLyricAlignment(
+    draft,
+    alignmentJob?.result as Alignment | undefined,
   );
-  const transcription = [...production.jobs]
-    .reverse()
-    .find(
-      (j) =>
-        j.kind === "lyric-transcription" &&
-        j.state === "succeeded" &&
-        j.input.language === draft.language,
-    );
-  const transcriptionBusy = production.jobs.some(
-    (j) => j.kind === "lyric-transcription" && busyJob(j),
-  );
-  const [reviewLyrics, setReviewLyrics] = useState("");
-  useEffect(() => {
-    setReviewLyrics(transcription?.result?.lyrics || "");
-  }, [transcription?.id, transcription?.result?.lyrics]);
   const [status, setStatus] = useState("Draft saved in this browser");
   const history = useRef<{ past: VideoDraft[]; future: VideoDraft[] }>({
     past: [],
@@ -494,6 +558,14 @@ function VideoEditor({
     };
   }, [track.id]);
   function change(patch: Partial<VideoDraft>) {
+    // Freeform lyric/language changes invalidate timing; timeline text edits
+    // provide their own matching snapshot and preserve the remaining words.
+    if (
+      ((patch.lyrics !== undefined && patch.lyrics !== draft.lyrics) ||
+        (patch.language !== undefined && patch.language !== draft.language)) &&
+      !patch.lyricRevision
+    )
+      patch = { ...patch, lyricRevision: undefined };
     if (patch.kind && patch.kind !== "directed") {
       const url = new URL(location.href);
       url.searchParams.delete("film");
@@ -515,6 +587,32 @@ function VideoEditor({
     setDraft(next);
     setHistoryTick((n) => n + 1);
   }
+  const timingEditor = alignment ? (
+    <LyricTimelineEditor
+      alignment={alignment}
+      draft={draft}
+      duration={duration}
+      audioRef={audioRef}
+      audioActive={active}
+      vocalPreviewEndpoint={
+        track.source ? `/api/takes/${track.id}/vocal-preview` : undefined
+      }
+      audioUrl={
+        track.source
+          ? `/api/takes/${track.id}/files/audio.mp3`
+          : `/media/desert-afterglow-${track.audio}.mp3`
+      }
+      position={position}
+      playing={previewPlaying}
+      play={() => play(track)}
+      seek={(time) => seek(track, time)}
+      change={change}
+      undo={() => undo()}
+      redo={() => undo(true)}
+      canUndo={history.current.past.length > 0}
+      canRedo={history.current.future.length > 0}
+    />
+  ) : null;
   async function importMedia(files: FileList | null) {
     if (!files?.length) return;
     if (sourceId !== track.id) chooseSource(track.id);
@@ -640,7 +738,7 @@ function VideoEditor({
     );
   }
   async function alignLyrics() {
-    change({ wordEdits: {}, cueEdits: {} });
+    change({ wordEdits: {}, cueEdits: {}, lyricRevision: undefined });
     await production.submit([
       {
         kind: "alignment",
@@ -658,9 +756,69 @@ function VideoEditor({
     if (job.input.aspect === draft.aspect || job.kind === "lyric-alignment")
       latestJobs.set(`${job.kind}:${job.input.slot}`, job);
   const visibleJobs = [...latestJobs.values()].filter(
-    (j) => busyJob(j) || j.state === "failed",
+    (j) =>
+      !["lyric-alignment", "lyric-transcription"].includes(j.kind) &&
+      (busyJob(j) || j.state === "failed"),
   );
   const perImage = duration / Math.max(1, draft.imageCount * draft.imageCycles);
+  if (draft.kind === "cinematic")
+    return (
+      <div className="video-workspace">
+        <div className="video-heading">
+          <div>
+            <h1>Create a music video</h1>
+            <p>From your song to a complete visual film.</p>
+          </div>
+        </div>
+        {sourcePanel}
+        <fieldset className="video-kind-switch">
+          <legend className="sr-only">Video type</legend>
+          {options.map(({ id, title, note, icon: Icon }) => (
+            <label key={id} className={draft.kind === id ? "chosen" : ""}>
+              <input
+                type="radio"
+                name="video-kind"
+                aria-label={title}
+                checked={draft.kind === id}
+                disabled={id === "directed" && !musicVideoAvailable}
+                onChange={() => change({ kind: id })}
+              />
+              <Icon size={20} />
+              <span>
+                <strong>{title}</strong>
+                <small>{note}</small>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <MusicVideoCreator
+          track={track}
+          lyrics={draft.lyrics}
+          language={draft.language}
+          aspect={draft.aspect}
+          cues={lyricRenderCues(alignment, draft)}
+          onAspect={(aspect) => change({ aspect })}
+          lyricControls={
+            <LyricPreparation
+              lyrics={draft.lyrics}
+              language={draft.language}
+              aspect={draft.aspect}
+              optional={false}
+              production={production}
+              alignment={alignment}
+              onLyrics={(lyrics) =>
+                change({ lyrics, cueEdits: {}, wordEdits: {} })
+              }
+              onLanguage={(language) =>
+                change({ language, cueEdits: {}, wordEdits: {} })
+              }
+              onAlign={alignLyrics}
+            />
+          }
+          timingEditor={timingEditor}
+        />
+      </div>
+    );
   if (["directed"].includes(draft.kind))
     return (
       <div className="video-workspace">
@@ -672,6 +830,7 @@ function VideoEditor({
             </p>
           </div>
         </div>
+        {sourcePanel}
         <fieldset className="video-kind-switch">
           <legend className="sr-only">Video type</legend>
           {options.map(({ id, title, note, icon: Icon }) => (
@@ -772,6 +931,21 @@ function VideoEditor({
           </button>
         </div>
       </div>
+      {sourcePanel}
+      <LyricPreparation
+        lyrics={draft.lyrics}
+        language={draft.language}
+        aspect={draft.aspect}
+        optional={draft.kind === "visualizer"}
+        production={production}
+        alignment={alignment}
+        onLyrics={(lyrics) => change({ lyrics, cueEdits: {}, wordEdits: {} })}
+        onLanguage={(language) =>
+          change({ language, cueEdits: {}, wordEdits: {} })
+        }
+        onAlign={alignLyrics}
+      />
+      {visualLyrics && timingEditor}
       <div className="video-generation-bar">
         <div>
           <strong>
@@ -784,29 +958,13 @@ function VideoEditor({
           <small>
             {alignment
               ? missingWordCount
-                ? `${missingWordCount} words have no complete timestamp. Open Word timing to set their times.`
+                ? `${missingWordCount} words have no complete timestamp. Open Edit lyric timing to place them.`
                 : reviewCount
                   ? `${reviewCount} confidence flags. Review while listening; these flags do not block rendering.`
                   : "Audio-derived word timing · review while listening"
               : "Your song and lyrics stay together throughout the video."}
           </small>
         </div>
-        <button
-          className="secondary-button"
-          disabled={
-            production.submitting ||
-            alignmentBusy ||
-            !draft.lyrics.trim() ||
-            !production.installed
-          }
-          onClick={() => void alignLyrics()}
-        >
-          {alignmentBusy
-            ? "Aligning lyrics…"
-            : alignment
-              ? "Align lyrics again"
-              : "Align lyrics"}
-        </button>
         {draft.kind === "kinetic" && (
           <button
             className="primary-button"
@@ -829,11 +987,6 @@ function VideoEditor({
           </button>
         )}
       </div>
-      {production.error && (
-        <p className="form-error" role="alert">
-          {production.error}
-        </p>
-      )}
       {draft.kind === "visualizer" && assetError && (
         <p className="form-error" role="alert">
           {assetError}
@@ -915,38 +1068,6 @@ function VideoEditor({
       </fieldset>
       <div className="video-workbench">
         <section className="video-settings" aria-label="Video settings">
-          <label>
-            Soundtrack
-            <select
-              aria-label="Soundtrack"
-              value={track.id}
-              onChange={(event) => chooseSource(event.target.value)}
-            >
-              {tracks.map((item) => (
-                <option value={item.id} key={item.id}>
-                  {item.title} ·{" "}
-                  {item.source === "imported"
-                    ? "Imported song"
-                    : item.source === "yue2"
-                      ? `Take ${item.take || 1}`
-                      : item.audio === 1
-                        ? "Amber take"
-                        : "Dusk take"}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="video-song-summary">
-            {track.cover ? (
-              <img src={track.cover} alt="" />
-            ) : (
-              <Music2 size={26} />
-            )}
-            <div>
-              <strong>{track.title}</strong>
-              <span>{timeLabel(duration)} · Original soundtrack</span>
-            </div>
-          </div>
           <fieldset className="video-control-section">
             <legend>Frame</legend>
             <div className="video-choice-row">
@@ -1109,7 +1230,7 @@ function VideoEditor({
                           aria-label={
                             kind === "images"
                               ? "Image slideshow"
-                              : "H3 animation loops"
+                              : "H3 video clips"
                           }
                           checked={draft.background === kind}
                           onChange={() => {
@@ -1123,7 +1244,7 @@ function VideoEditor({
                           <Film size={17} />
                         )}
                         <span>
-                          {kind === "images" ? "Slideshow" : "Animation loops"}
+                          {kind === "images" ? "Slideshow" : "Video clips"}
                           <small>
                             {kind === "images"
                               ? "Generated images"
@@ -1288,7 +1409,7 @@ function VideoEditor({
               )}
               {draft.kind !== "visualizer" && draft.background === "motion" && (
                 <fieldset className="video-motion-content">
-                  <legend>H3 animation</legend>
+                  <legend>Video clip direction</legend>
                   <label>
                     Content
                     <select
@@ -1324,123 +1445,6 @@ function VideoEditor({
                   </p>
                 </fieldset>
               )}
-              <details className="video-disclosure">
-                <summary>
-                  Lyrics & timing{" "}
-                  <span>
-                    {cues.length ? `${cues.length} lines` : "Add lyrics"}
-                  </span>
-                  <ChevronDown size={15} />
-                </summary>
-                <div>
-                  <button
-                    className="secondary-button"
-                    disabled={
-                      !production.installed ||
-                      production.submitting ||
-                      transcriptionBusy ||
-                      alignmentBusy
-                    }
-                    onClick={() =>
-                      void production.submit([
-                        {
-                          kind: "transcription",
-                          slot: 0,
-                          aspect: draft.aspect,
-                          seconds: 8,
-                          lyrics: "",
-                          language: draft.language,
-                          prompt: "",
-                        },
-                      ])
-                    }
-                  >
-                    {transcriptionBusy
-                      ? "Transcribing song…"
-                      : "Transcribe lyrics from song"}
-                  </button>
-                  <p className="video-field-note">
-                    Transcribe the recorded vocal, review the draft, then align
-                    the corrected lyrics. Requires the local lyric-alignment
-                    runtime.
-                  </p>
-                  {transcription && (
-                    <div>
-                      <label>
-                        Review transcribed lyrics
-                        <textarea
-                          rows={7}
-                          aria-label="Review transcribed lyrics"
-                          value={reviewLyrics}
-                          onChange={(e) => setReviewLyrics(e.target.value)}
-                        />
-                      </label>
-                      <p className="video-field-note">
-                        Transcription can mishear singing or invent words during
-                        instrumental passages. Listen and correct the draft
-                        before using it.
-                      </p>
-                      {!transcription.result?.lyrics?.trim() && (
-                        <p>
-                          No words were recognized. You can type the lyrics
-                          below.
-                        </p>
-                      )}
-                      <button
-                        className="secondary-button"
-                        disabled={!reviewLyrics.trim()}
-                        onClick={() =>
-                          change({
-                            lyrics: reviewLyrics,
-                            cueEdits: {},
-                            wordEdits: {},
-                          })
-                        }
-                      >
-                        Use reviewed lyrics
-                        {draft.lyrics.trim() ? " (replace current lyrics)" : ""}
-                      </button>
-                    </div>
-                  )}
-                  <label>
-                    Video lyrics
-                    <textarea
-                      rows={7}
-                      aria-label="Video lyrics"
-                      value={draft.lyrics}
-                      onChange={(event) =>
-                        change({
-                          lyrics: event.target.value,
-                          cueEdits: {},
-                          wordEdits: {},
-                        })
-                      }
-                      placeholder="Paste the lyrics you want to show. Section labels stay out of the video."
-                    />
-                  </label>
-                  <label>
-                    Lyric language
-                    <select
-                      value={draft.language}
-                      onChange={(e) =>
-                        change({ language: e.target.value, wordEdits: {} })
-                      }
-                    >
-                      <option value="en">English</option>
-                      <option value="es">Spanish</option>
-                      <option value="fr">French</option>
-                      <option value="de">German</option>
-                      <option value="it">Italian</option>
-                      <option value="pt">Portuguese</option>
-                    </select>
-                  </label>
-                  <p className="video-field-note">
-                    Align lyrics reads the recorded vocal. Editing the lyrics or
-                    language requires a new alignment. Uncertain words are
-                    flagged below.
-                  </p>
-                </div>
-              </details>
               <details className="video-disclosure">
                 <summary>
                   Type & motion
@@ -2032,15 +2036,6 @@ function VideoEditor({
             </p>
           )}
         </section>
-      )}
-      {visualLyrics && alignment && (
-        <WordTimingEditor
-          alignment={alignment}
-          draft={draft}
-          duration={duration}
-          change={change}
-          seek={(seconds) => seek(track, seconds)}
-        />
       )}
       {timingErrors.length > 0 && (
         <p className="form-error">{timingErrors[0]}</p>

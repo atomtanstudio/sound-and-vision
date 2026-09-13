@@ -99,3 +99,40 @@ def test_transcription_job_routes_to_local_runner_and_persists(client, monkeypat
     assert len(calls)==1
     assert c.post(f"/api/takes/{t['id']}/video",json=body).json()['id']==a.json()['id']
     assert store.rows()[0]['form']['lyrics']==''
+
+
+def test_import_accepts_large_audio_through_request_filter(client):
+    c, store, _ = client
+    out = io.BytesIO()
+    with wave.open(out, 'wb') as audio:
+        audio.setnchannels(2)
+        audio.setsampwidth(2)
+        audio.setframerate(48000)
+        audio.writeframes(b'\0' * (48000 * 4 * 35))
+    payload = out.getvalue()
+    assert len(payload) > 6.3 * 1024 * 1024
+    response = c.post('/api/songs/import', content=payload, headers={'x-filename': 'Large.wav'})
+    assert response.status_code == 201, response.text
+    assert response.json()['duration'] == 35
+
+
+def test_request_filter_keeps_route_specific_limits(client):
+    c, store, _ = client
+    for path, limit in [('/api/songs/import', 100 * 1024 * 1024),
+                        ('/api/references', 50 * 1024 * 1024),
+                        ('/api/library/actions', 1024 * 1024)]:
+        response = c.post(path, content=b'x', headers={'content-length': str(limit + 1)})
+        assert response.status_code == 413
+    assert store.rows() == []
+
+
+def test_transcription_result_serializes_numpy_confidence_values():
+    import json
+    import pytest
+    np = pytest.importorskip("numpy", reason="NumPy is provided by the optional audio runtime")
+    from .alignment_runner import transcript_draft
+    heard = [{'word': 'Test', 'start': np.float64(1), 'end': np.float64(2),
+              'probability': np.float64(0.4)}]
+    result = transcript_draft(heard, np.float64(10))
+    assert type(result['reviewCount']) is int
+    assert json.loads(json.dumps(result))['reviewCount'] == 1

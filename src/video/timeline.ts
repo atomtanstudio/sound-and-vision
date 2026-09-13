@@ -3,7 +3,7 @@ import type { Track } from "../music-studio/model";
 import { visualizerSchedule } from "./visualizers/schedule.ts";
 
 export const FPS = 24;
-export type VideoKind = "kinetic" | "visualizer" | "directed";
+export type VideoKind = "kinetic" | "visualizer" | "directed" | "cinematic";
 export type BackgroundKind = "images" | "motion";
 export type LyricCue = {
   id: string;
@@ -45,6 +45,7 @@ export type VideoDraft = {
   intensity: number;
   language: string;
   wordEdits: Record<string, { start: number | null; end: number | null }>;
+  lyricRevision?: { language: string; alignment: Alignment };
   font: "bold" | "soft" | "editorial";
   textSize: number;
   placement: "center" | "lower";
@@ -79,7 +80,7 @@ export function makeDraft(track: Track): VideoDraft {
   );
   return {
     version: 1,
-    kind: "kinetic",
+    kind: track.source ? "cinematic" : "kinetic",
     aspect: "16:9",
     background: "images",
     imageCount: 10,
@@ -154,12 +155,30 @@ export function lyricLines(text: string) {
     .filter((line) => line && !/^\[[^\]]+\]$/.test(line))
     .map((text, index) => ({ id: `line-${index}`, text }));
 }
-export function alignedCues(
+export type LyricRenderCue = Pick<Alignment["cues"][number], "words">;
+
+/** A text edit owns a complete local lyric/timing snapshot, independent of polling. */
+export function currentLyricAlignment(
+  draft: VideoDraft,
+  automatic?: Alignment,
+) {
+  const revision = draft.lyricRevision;
+  if (
+    revision?.language === draft.language &&
+    revision.alignment.lyrics === draft.lyrics
+  )
+    return revision.alignment;
+  return automatic?.lyrics === draft.lyrics ? automatic : undefined;
+}
+
+/** Export keeps untimed words too; preview-only filtering must not change the lyric sheet. */
+export function lyricRenderCues(
   alignment: Alignment | undefined,
   draft: VideoDraft,
-): LyricCue[] {
-  if (!alignment || alignment.lyrics !== draft.lyrics) return [];
-  const cues = alignment.cues.flatMap((line) => {
+) {
+  alignment = currentLyricAlignment(draft, alignment);
+  if (!alignment) return [];
+  return alignment.cues.map((line) => {
     const words = line.words.map((w, i) => {
       const edit = draft.wordEdits[`${line.id}:${i}`];
       return edit
@@ -173,6 +192,44 @@ export function alignedCues(
           }
         : w;
     });
+    return { ...line, words };
+  });
+}
+
+export function lyricTimingReview(cues: LyricRenderCue[], duration: number) {
+  let missing = 0,
+    conflicting = 0,
+    usable = 0,
+    last = 0;
+  for (const cue of cues)
+    for (const word of cue.words) {
+      const { start, end } = word;
+      if (start == null || end == null) {
+        missing++;
+        continue;
+      }
+      if (
+        !Number.isFinite(start + end) ||
+        start < 0 ||
+        end <= start ||
+        end > duration + 0.05 ||
+        start < last - 0.001
+      ) {
+        conflicting++;
+        continue;
+      }
+      usable++;
+      last = end;
+    }
+  return { missing, conflicting, usable, omitted: missing + conflicting };
+}
+
+export function alignedCues(
+  alignment: Alignment | undefined,
+  draft: VideoDraft,
+): LyricCue[] {
+  const cues = lyricRenderCues(alignment, draft).flatMap((line) => {
+    const words = line.words;
     const timed = words.filter((w) => w.start !== null && w.end !== null);
     if (!timed.length) return [];
     return [

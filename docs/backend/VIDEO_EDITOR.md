@@ -5,12 +5,49 @@ The Video page generates background images through the connected OpenAI account 
 ## In the app
 
 1. Choose a finished song, Kinetic lyric video, and 16:9 or 9:16.
-2. Choose Slideshow or Animation loops, set the count, and edit the visual theme if desired. **Generate images / Generate clips** submits missing slots. A selected slot has its own Generate / Regenerate button. Existing results remain visible until a successful replacement arrives.
+2. Choose Slideshow or Video clips, set the count, and edit the visual theme if desired. **Generate images / Generate clips** submits missing slots. A selected slot has its own Generate / Regenerate button. Existing results remain visible until a successful replacement arrives.
 3. H3 content can be thematic scenes, abstract motion graphics, animated text, or alternating scenes and animated text. Short text is a separate field. Generated lettering is baked into the clip and needs visual review; it is not the precisely synchronized sung-lyric layer.
-4. **Align lyrics** reads the recorded audio. Review uncertain and missing words in **Word timing**. Click a word to seek to its vocal context; edit its start/end in seconds. Changing video lyrics or language invalidates the previous alignment without changing the original song.
+4. **Align lyrics** reads the recorded audio. Then open **Edit lyric timing**, directly below Lyrics, to review and correct the alignment against the song waveform. Changing video lyrics or language invalidates the previous alignment without changing the original song.
 5. Choose Automatic, Word pop, Slam, Rise, Word highlight, Line reveal or Calm. Automatic varies entrances by lyric line. Strength, font, size, color, position, shade and reduced-motion support remain editable.
 
-No word-count-based lyric timing remains. Before alignment, only the title/background is previewed. Automatic alignment is evidence, not a guarantee of correct timing: missing lyrics, ad-libs, repetitions, scraped webpage text, vocal effects and overlapping singers need review. Original lyric text and repeated occurrences are preserved. Unmatched words have null timestamps rather than invented ones. Flagged measured timings remain available to audition and correct.
+Automatic alignment does not invent timing for unmatched words. Before alignment, only the title/background is previewed. Automatic alignment is evidence, not a guarantee of correct timing: missing lyrics, ad-libs, repetitions, scraped webpage text, vocal effects and overlapping singers need review. Original lyric text and repeated occurrences are preserved. Unmatched words have null timestamps until you time them manually. Flagged measured timings remain available to audition and correct.
+
+## Correct timing on the waveform
+
+The same editor is available for Music video, Kinetic lyric video, and Visualizer video with lyrics enabled. Automatic alignment remains the starting point.
+
+1. Open **Edit lyric timing** under Lyrics. **Next to review** finds a line with missing, conflicting, or uncertain words; all lines remain selectable in the list, including lines with no timestamps.
+   Each phrase in the left-hand list has an **Insert at playhead** button. Scrub to the phrase's vocal entrance, then click that button to place the entire existing phrase in one action. It keeps the playhead in place, preserves complete word spacing, and moves the phrase's lyric-sheet position when needed without duplicating it. For missing or invalid word timing, it creates a provisional, evenly spaced phrase block, bounded by the next phrase or song end and marked for review. Fine-tune the word times or use tap timing while listening. Undo restores the previous timing and lyric order. A fully timed phrase that would run past the song end is rejected rather than shifted away from the playhead.
+2. Use the **arrow tool** to click or drag on the waveform and scrub the song. Switch to the **hand tool** to drag the waveform or lyric tracks left/right without moving the playhead or editing timestamps. Play/Pause, zoom, and the range slider remain available. Follow playback keeps the current position in view.
+3. Drag a line block to move all its timed words together, preserving their spacing and pauses. Missing endpoints stay missing. Focus a block and use arrow keys for 0.05-second nudges, or Shift+arrow for 0.5 seconds.
+4. Select a word to drag it separately or resize its start/end edges. Numeric start/end fields and **Set start/end at playhead** allow precise corrections. Clear an endpoint to remove its timing. Overlaps and words in the wrong order remain flagged for review.
+5. For a missing or badly timed line, choose **Time this line by tapping**. Play the song, then click the Mark button (or focus it and press Space) as each word starts. Mark the line's end after the last word. Taps are temporary until that final mark; Cancel leaves saved timings unchanged. These are manual timings: each word initially ends at the next tap, so shorten word endings afterward where you hear pauses.
+
+Undo/redo can revert a drag, a complete tap session, or a text edit. **Reset line** reverses timing adjustments since the most recent timeline text edit (or restores automatic timing if no text edits have been made). The detailed **Word timing** table remains below the waveform.
+
+### Remove, add, and repeat lyrics
+
+- Select a word, then **Delete word** to remove unwanted text and its timestamp. **Delete phrase** removes the entire selected line. All other words keep their current timing. Undo restores text and timing together.
+- **Add phrase** accepts typed or pasted lyrics; each newline becomes a separate phrase. Choose a position near the playhead, before/after the selected line, or at the end of the sheet. New words start untimed and can be placed using tap timing or individual start/end controls.
+- **Duplicate word** or **Duplicate phrase** opens a copy in the insertion form. Move the playhead to the new vocal entrance, keep **Reuse copied timing at playhead** checked, then insert. The copy retains word lengths and pauses and is flagged for review. This is useful for repeated words such as “Megalomaniac.” Uncheck reuse to place the copy's words manually instead.
+
+Timeline text edits update the video lyric sheet and save a complete local timing snapshot, preserving existing corrections even after word indices change or the page reloads. They do not require full-song realignment. Editing the separate freeform lyric sheet or changing language still invalidates timing; **Align lyrics again** replaces manual timing with a new automatic pass.
+
+Corrections save with the per-song browser draft and feed new previews and exports through the existing word-edit payload. They do not rewrite a previously rendered video or synchronize to another browser. The waveform is decoded locally from the selected editing audio, using a reduced sample rate and a small peak cache. A waveform load error leaves playback and numeric timing controls available.
+
+### Live preview and vocal monitoring
+
+The **Live lyric preview** shows the current line against a plain background and highlights the active word while playing or scrubbing, without rendering a video. It also marks untimed words and gaps between words so they can be reviewed.
+
+Choose **Listen to → Vocals only** to hear the existing Demucs stem and view its waveform. This becomes available after local alignment or transcription has cached the stem for that recording. The untouched song remains the clock; the monitor follows its playback, seeks, volume, and pause state. Closing the timing editor, leaving the video page, or switching back to Original mix restores normal listening. A missing or failed stem falls back to the mix. No additional separation job starts, and exports always use the original soundtrack.
+
+The authenticated `/api/takes/{takeId}/vocal-preview` endpoint reports availability; its `/audio` route serves the song's matching cached WAV with range support. The association comes from the exact source audio hash, never a client-supplied file path.
+
+## Finding completed media
+
+The **Library** sidebar page combines playable songs with completed guided music-video exports, visualizer exports (including retained local render history), and older film exports. It provides search, Music/Videos filters, inline playback, downloads, and editor handoff for supported modes. Each completed export remains a separate version. Trashed media and unfinished or missing video files are excluded, with an availability notice when a history source cannot be reached. Existing song management and generation controls stay on Music.
+
+`/api/library/videos` reads completed music-video jobs and existing film manifests. Visualizer history comes from the existing `/local-api/visualizer-renders` service. Library is a view over those durable stores; it does not copy files or submit generation work.
 
 ## Alignment
 
@@ -52,10 +89,12 @@ Images serialize with cover generation through the shared account image semaphor
 
 Generated files, input records, provider checkpoints and alignment evidence live under `data/video/` on Legion. Editing settings/word corrections remain per-take browser drafts; local imports use IndexedDB. Drafts are not yet server-synchronized. Generated images/clips are server-persistent. JSON export is an editing manifest, not an MP4, and includes generated asset URLs plus word timings; imported media must accompany it on another device.
 
-Visualizer and Music video tabs remain setup paths. Neither claims a finished audio-reactive visualizer, directed film, singing lip sync or export.
+Visualizer video exports are available through the existing renderer. The guided [Music video](MUSIC_VIDEO.md) flow now assembles complete MP4s from sequential H3 scenes. The granular Kinetic lyric video background editor retains its existing controls. Experimental lip-sync performance remains gated.
 
 ## Checks
 
 `npm run test:video`, `npm test`, `npm run build`, and `python -m pytest backend/test_video.py backend/test_api.py backend/test_assistance.py backend/test_library.py -q` cover timeline logic, word uncertainty, deterministic animation, API idempotency/authentication, original app behavior and build validity. Live checks cover an account-generated image, a native H3 scene clip, H3 typography, real song alignment and browser reload/seek behavior. Machine alignment results still require listening review.
+
+With the development app running on port 5190, `node scripts/verify-lyric-timeline.mjs` checks waveform decoding, dragging/resizing, shared audio scrubbing, tap repairs, undo/redo, draft persistence, responsive layout, and the corrected export payload using an isolated library and seekable audio fixture. It does not submit real generation jobs.
 
 Kinetic entrance math is adapted from Rich Gates's MaxMusic `render/engine.mjs` (MIT; notice in `docs/licenses/MaxMusic-MIT.txt`). Sound and Vision uses DOM word spans and the shared audio clock, not the old song-specific renderer. Model and package licenses remain separate from the app's Apache-2.0 license; consult each upstream model card before redistribution.

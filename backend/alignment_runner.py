@@ -144,9 +144,9 @@ def transcript_draft(heard, duration):
         previous_end = word["end"]
     if current:
         lines.append(" ".join(current))
-    return {"lyrics": "\n".join(lines), "duration": duration, "requiresReview": True,
+    return {"lyrics": "\n".join(lines), "duration": float(duration), "requiresReview": True,
             "method": "Demucs vocal isolation + Whisper large-v3 transcription",
-            "reviewCount": sum(w.get("probability", 0) < 0.65 for w in heard),
+            "reviewCount": sum(1 for w in heard if w.get("probability", 0) < 0.65),
             "warning": "Review every line against the song. Singing and instrumental passages can produce incorrect or invented words."}
 
 

@@ -1,6 +1,6 @@
 # Sound and Vision self-hosted release candidate
 
-This package contains the application source, lock files, sample assets and setup guides. It contains no user library, login credentials or model weights. Music video is marked **Coming soon** and disabled; music, kinetic lyric videos and visualizer videos remain available.
+This package contains the application source, lock files, sample assets and setup guides. It contains no user library, login credentials or model weights. Music video creates thematic full-song films. Experimental lip-sync performance remains **Coming soon**; music, kinetic lyric videos and visualizer videos remain available.
 
 ## Before you start
 
@@ -172,7 +172,15 @@ Writing and image providers are optional for this first test when you supply the
 
 In **Video**, choose **Import song**. WAV, FLAC, MP3, M4A, and OGG are supported, up to 100 MB and 10 minutes. FFmpeg on the backend validates and converts the recording; no music-generation model or reference-transcription runtime is used for import. The original upload is preserved privately, and playback copies are saved in the backend library under **Imported songs**.
 
-For a lyric video, add the song’s lyrics in the editor and align them (alignment still requires its separate runtime). Import itself does not transcribe lyrics. Under **Lyrics & timing**, choose **Transcribe lyrics from song** to isolate the vocal and run local Whisper speech-to-text. Review and edit the draft, then choose **Use reviewed lyrics** and **Align lyrics**. This separate transcription step requires the same local runtime as lyric alignment; it does not use OpenAI. For a visualizer without words, leave lyrics empty. Imports remain available after reload and support normal library rename, move, and Trash controls.
+For a lyric video, add the song’s lyrics in the editor and align them (alignment still requires its separate runtime). Import itself does not transcribe lyrics; the Lyrics section shows the next step. In the visible **Lyrics** section below **Soundtrack**, choose **Transcribe lyrics from song** to isolate the vocal and run local Whisper speech-to-text. Review and edit the draft, then choose **Use reviewed lyrics** and **Align lyrics**. This separate transcription step requires the same local runtime as lyric alignment; it does not use OpenAI. For a visualizer without words, leave lyrics empty. Imports remain available after reload and support normal library rename, move, and Trash controls.
+
+## Scene-based music videos
+
+Choose **Music video** in Video to use the guided theme → plan → render flow. This requires a configured writing provider (OpenAI account or local LLM), the existing [H3LIX integration](docs/backend/VIDEO_EDITOR.md) H3 service reachable from the backend, and FFmpeg/ffprobe. Set `SOUND_VISION_H3_URL` in the backend environment to its private API address (default `http://127.0.0.1:7310`). The service must support Text to Video and Frames to Video with Turbo enabled. It can run on the same GPU computer; the app serializes clips with music generation.
+
+For **On-screen lyrics**, install the local lyric-alignment runtime described in [the video editor guide](docs/backend/VIDEO_EDITOR.md). The backend's FFmpeg must include the `ass` filter (libass): check `ffmpeg -filters`. On macOS, use a full FFmpeg build with libass if the default build omits it. These exports run on the backend and do not require Chromium. The app checks FFmpeg and its lyric-rendering capability before starting clip generation.
+
+Review transcription errors before using lyrics. Missing or conflicting word timing is shown before video generation; use Advanced controls → Word timing to correct it. Alternatively, explicitly select **Omit words with unusable timing** to leave those words off the video while preserving the lyric sheet. Re-aligning may return the same gaps. Full-song footage, repeats, blends and continued scene pairs are explained in [Music-video workflow](docs/backend/MUSIC_VIDEO.md).
 
 ## If something does not work
 

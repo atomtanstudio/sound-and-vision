@@ -118,7 +118,7 @@ test("background prompts carry song context, aspect, quiet text area and H3 nati
 test("portable editing plan states timing and rendering limitations and preserves original soundtrack", () => {
   const m = videoManifest(
     track,
-    { ...makeDraft(track), aspect: "9:16" },
+    { ...makeDraft(track), kind: "kinetic", aspect: "9:16" },
     180,
     [],
   );
@@ -237,4 +237,99 @@ test("adjacent lyric lines hand off cleanly despite frame rounding or short voca
     draft,
   );
   assert.match(timingIssues(cues, 10)[0], /overlaps/);
+});
+
+test("library refresh repairs duplicate imported-song cache entries", async () => {
+  const { uniqueTracks } = await import("../src/music-studio/model.ts");
+  const imported = {
+    id: "imported",
+    source: "imported",
+    title: "Current title",
+  };
+  const cached = { id: "imported", title: "Old cached title" };
+  const local = { id: "sample", title: "Local sample" };
+  let result = uniqueTracks([imported, cached, cached, local]);
+  assert.deepEqual(result, [imported, local]);
+  for (let i = 0; i < 5; i++)
+    result = uniqueTracks([imported, ...result.filter((t) => !t.source)]);
+  assert.deepEqual(result, [imported, local]);
+});
+
+test("music-video export retains every lyric line even when preview has no timestamps", async () => {
+  const { lyricRenderCues, lyricTimingReview } =
+    await import("../src/video/timeline.ts");
+  const draft = {
+    ...makeDraft(track),
+    lyrics: "First\nMissing line\nLast",
+    wordEdits: {},
+  };
+  const alignment = {
+    lyrics: draft.lyrics,
+    cues: [
+      {
+        id: "line-0",
+        text: "First",
+        words: [{ text: "First", start: 1, end: 2 }],
+      },
+      {
+        id: "line-1",
+        text: "Missing line",
+        words: [
+          { text: "Missing", start: null, end: null },
+          { text: "line", start: null, end: null },
+        ],
+      },
+      {
+        id: "line-2",
+        text: "Last",
+        words: [{ text: "Last", start: 3, end: 4 }],
+      },
+    ],
+  };
+  assert.equal(alignedCues(alignment, draft).length, 2);
+  const output = lyricRenderCues(alignment, draft);
+  assert.equal(output.length, 3);
+  assert.deepEqual(
+    output.flatMap((c) => c.words.map((w) => w.text)),
+    ["First", "Missing", "line", "Last"],
+  );
+  assert.deepEqual(lyricTimingReview(output, 10), {
+    missing: 2,
+    conflicting: 0,
+    usable: 2,
+    omitted: 2,
+  });
+  const corrected = lyricRenderCues(alignment, {
+    ...draft,
+    wordEdits: {
+      "line-1:0": { start: 2.1, end: 2.4 },
+      "line-1:1": { start: 2.4, end: 2.8 },
+    },
+  });
+  assert.equal(lyricTimingReview(corrected, 10).omitted, 0);
+  assert.equal(
+    lyricRenderCues(alignment, { ...draft, lyrics: "Other lyrics" }).length,
+    0,
+  );
+  assert.equal(alignment.cues[1].words[0].start, null);
+});
+
+test("timing review counts conflicts without moving or guessing timestamps", async () => {
+  const { lyricTimingReview } = await import("../src/video/timeline.ts");
+  const cues = [
+    {
+      words: [
+        { text: "A", start: 1, end: 2 },
+        { text: "B", start: 1.5, end: 2.5 },
+        { text: "C", start: 3, end: 4 },
+        { text: "D", start: null, end: null },
+      ],
+    },
+  ];
+  assert.deepEqual(lyricTimingReview(cues, 10), {
+    missing: 1,
+    conflicting: 1,
+    usable: 2,
+    omitted: 2,
+  });
 });

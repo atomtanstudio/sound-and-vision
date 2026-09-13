@@ -54,7 +54,9 @@ export const busyJob = (job: VideoJob) =>
 export function useVideoProduction(takeId: string) {
   const [jobs, setJobs] = useState<VideoJob[]>([]);
   const [error, setError] = useState("");
+  const [pollError, setPollError] = useState("");
   const [installed, setInstalled] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
     let cancelled = false,
@@ -68,10 +70,11 @@ export function useVideoProduction(takeId: string) {
         if (!cancelled) {
           setJobs(state.jobs);
           setInstalled(state.alignmentInstalled);
-          setError("");
+          setLoading(false);
+          setPollError("");
         }
       } catch (e) {
-        if (!cancelled) setError((e as Error).message);
+        if (!cancelled) setPollError((e as Error).message);
       }
       if (!cancelled) timer = setTimeout(poll, 2000);
     };
@@ -102,12 +105,30 @@ export function useVideoProduction(takeId: string) {
     }
   }
   async function action(job: VideoJob, operation: "cancel" | "retry") {
+    setSubmitting(true);
+    setError("");
     try {
-      await request(`/video/jobs/${job.id}/${operation}`, {});
-      setError("");
+      const updated = await request<VideoJob>(
+        `/video/jobs/${job.id}/${operation}`,
+        {},
+      );
+      setJobs((old) => [
+        ...old.filter((j) => j.id !== updated.id),
+        { ...updated, input: job.input },
+      ]);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setSubmitting(false);
     }
   }
-  return { jobs, error, installed, submitting, submit, action };
+  return {
+    jobs,
+    error: error || pollError,
+    installed,
+    loading,
+    submitting,
+    submit,
+    action,
+  };
 }

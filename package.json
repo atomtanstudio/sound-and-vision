@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5190 --strictPort",
     "test": "node scripts/verify-studio.mjs",
-    "test:video": "node --experimental-strip-types --test scripts/test-video-timing.mjs scripts/test-visualizer-export.mjs scripts/test-visualizer-relay.mjs",
+    "test:video": "node --experimental-strip-types --test scripts/test-video-timing.mjs scripts/test-lyric-editing.mjs scripts/test-visualizer-export.mjs scripts/test-visualizer-relay.mjs",
     "test:security": "node --experimental-strip-types --test scripts/test-security.mjs",
     "format": "prettier --write src scripts vite.config.ts",
     "screenshots": "node scripts/capture-studio.mjs"

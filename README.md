@@ -22,7 +22,7 @@ https://github.com/user-attachments/assets/00cfb259-6bd5-4cb9-8406-b7ac82bf8a69
 
 [Download the full video · 4:40](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-2.mp4)
 
-A scene-based music-video example. This feature remains Coming soon in the release.
+A scene-based music-video example. This preview uses the earlier experimental performance workflow; lip-sync production remains Coming soon.
 
 https://github.com/user-attachments/assets/85fb3882-3746-4361-92b9-395c290204ab
 
@@ -41,11 +41,11 @@ https://github.com/user-attachments/assets/8d72feaf-2332-4ebb-96c9-99261b0de091
 Video footage paired with on-screen lyrics.
 
 
-The promo plays in full; each example above is a 30-second preview. Full-quality originals are available through the download links and release attachments rather than stored in Git history. The music-video example demonstrates an experimental workflow; music-video generation remains **Coming soon** in this release.
+The promo plays in full; each example above is a 30-second preview. Full-quality originals are available through the download links and release attachments rather than stored in Git history. The music-video example demonstrates an experimental workflow; lip-sync performance remains **Coming soon**. The current Music video flow creates thematic scenes without audio-driven faces.
 
 
 
-A free, self-hosted music workspace with local YuE2 generation, writing assistance, cover art, kinetic lyric videos and visualizer videos. Choose an OpenAI account or local writing and ComfyUI image models. **Music video is Coming soon** while scene generation and character consistency are refined; existing music-video projects are preserved.
+A free, self-hosted music workspace with local YuE2 generation, writing assistance, cover art, kinetic lyric videos and visualizer videos. Choose an OpenAI account or local writing and ComfyUI image models. **Music video** creates a full-song scene film with optional timed lyrics. Lip-sync performance remains Coming soon; existing experimental projects are preserved.
 
 Start with the [self-hosted installation guide](SELF_HOSTED.md), then [AI setup](docs/backend/LOCAL_PROVIDERS.md) for **Qwen3.5 + Ollama**, **Krea 2 Turbo**, SDXL or a custom ComfyUI workflow. Local mode needs no OpenAI account. The music backend currently targets Linux and a compatible NVIDIA GPU; this is a single-owner installation, not a public multi-user service.
 
@@ -55,9 +55,19 @@ Start with the [self-hosted installation guide](SELF_HOSTED.md), then [AI setup]
 
 Follow the [step-by-step setup guide](SELF_HOSTED.md). It covers prerequisites, backend installation, the private local connection, optional AI providers, and your first song. Start there before running `npm run dev`; installing the frontend alone does not install the music backend. A second computer and SSH are optional.
 
+## Library
+
+Use **Library** in the sidebar to find saved songs and completed videos together. Filter by Music or Videos, search by title, play videos inline, download exports, or reopen a song in the video editor. The Music page retains its generation queue and detailed song controls.
+
 ## Bring your own song
 
-Open **Video → Import song** to use an existing WAV, FLAC, MP3, M4A, or OGG recording (up to 100 MB and 10 minutes). It is saved in **Imported songs**, selected as the soundtrack, and available after reload. Add the lyrics in the video editor and align them for kinetic text, or choose a visualizer without lyrics. Importing does not generate a song. Under **Lyrics & timing**, choose **Transcribe lyrics from song**, correct the editable draft, and select **Use reviewed lyrics** before alignment. Transcription requires the local lyric-alignment runtime. The experimental music-video option remains Coming soon.
+Open **Video → Import song** to use an existing WAV, FLAC, MP3, M4A, or OGG recording (up to 100 MB and 10 minutes). It is saved in **Imported songs**, selected as the soundtrack, and available after reload. Add the lyrics in the video editor and align them for kinetic text, or choose a visualizer without lyrics. Importing does not generate a song. In the visible **Lyrics** section below **Soundtrack**, choose **Transcribe lyrics from song**, correct the editable draft, and select **Use reviewed lyrics** before alignment. Transcription requires the local lyric-alignment runtime. Enable **On-screen lyrics** to access this step in the guided Music video flow. Lip-sync performance remains Coming soon.
+
+## Create a full-song music video
+
+In **Video**, choose a soundtrack and **Music video**. Review the suggested visual theme, choose new footage for the whole song or a smaller repeating set, then select **Prepare video**. Review the clip count and choose **Create video**. The app plans scenes, aligns reviewed lyrics when enabled, renders H3 Turbo clips sequentially, and assembles a downloadable 1080p MP4 with the original audio.
+
+**Advanced controls** offers clip length, landscape/portrait, cuts, soft blends, or continued scenes in pairs using the previous clip's final frame. Matching frames does not guarantee perfectly smooth motion. Completed clips survive failures; **Resume video** continues the same plan. Stop finishes the current clip safely. Theme/storyboard planning uses your configured text provider; rendering requires the H3LIX service and FFmpeg. See [setup and limitations](docs/backend/MUSIC_VIDEO.md).
 
 ## Working music flow
 
@@ -89,7 +99,7 @@ The complete upstream documentation, examples, skill references, model cards and
 
 ## Still separate
 
-OpenAI account sign-in, local providers, reviewed song ideas/lyrics/style/score edits, per-take cover art, and reference-audio transcription are connected. See [Assistance and reference songs](docs/backend/ASSISTANCE.md) for usage and installation. Music creation uses reviewed lyrics; reference audio supplies a melody or full score, not sung-word transcription. Public D1 hosting remains separate. Music-video generation is disabled in the release. The two original instrumental fixtures remain samples, not YuE2 output.
+OpenAI account sign-in, local providers, reviewed song ideas/lyrics/style/score edits, per-take cover art, and reference-audio transcription are connected. See [Assistance and reference songs](docs/backend/ASSISTANCE.md) for usage and installation. Music creation uses reviewed lyrics; reference audio supplies a melody or full score, not sung-word transcription. Public D1 hosting remains separate. The guided scene-based Music video workflow is available; experimental lip-sync generation remains disabled. The two original instrumental fixtures remain samples, not YuE2 output.
 
 The browser's local draft editor still works without a configured backend. Generated takes and their metadata live on your backend computer. A public multi-user deployment needs a separate user-access/authentication layer; the current service is a private single-owner installation.
 

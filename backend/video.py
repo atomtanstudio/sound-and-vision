@@ -23,6 +23,8 @@ class VideoRequest(BaseModel):
     referenceImageJobId: str | None = Field(
         default=None, pattern=r"^[a-zA-Z0-9_-]{8,80}$"
     )
+    continuationJobId: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{8,80}$")
+    continuationSeconds: float | None = Field(default=None, ge=1, le=20, allow_inf_nan=False)
     prompt: str = Field(default="", max_length=12000)
     lyrics: str = Field(default="", max_length=30000)
     language: str = Field(default="en", pattern=r"^[a-z]{2,3}$")
@@ -35,6 +37,10 @@ class VideoRequest(BaseModel):
             )
         if self.audioStart is not None and self.kind != "motion":
             raise ValueError("Audio references apply to motion clips only.")
+        if (self.continuationJobId is None) != (self.continuationSeconds is None):
+            raise ValueError("A continuation requires a previous clip and its end time.")
+        if self.continuationJobId and (self.kind != "motion" or self.audioStart is not None):
+            raise ValueError("Frame continuation is only available for motion without audio driving.")
         return self
 
 
@@ -280,6 +286,14 @@ def routes(service, manager):
                                     ).decode(),
                                 },
                             ]
+                        if payload.get("continuationJobId"):
+                            prior = folder(payload["continuationJobId"])/"background.mp4"
+                            end = payload["continuationSeconds"]
+                            await run_process(["ffmpeg", "-y", "-v", "error", "-ss", str(max(0, end-1)), "-i", prior,
+                                "-vf", "trim=duration=1,reverse", "-frames:v", "1", work/"start-frame.png"], work, 120)
+                            provider_request["mode"] = "Frames to Video"
+                            provider_request["assets"] = [{"id": "start-frame", "kind": "image", "fileName": "start-frame.png", "role": "Start frame",
+                                "dataUrl": "data:image/png;base64," + base64.b64encode((work/"start-frame.png").read_bytes()).decode()}]
                         # Intent is written before the non-idempotent external submission.
                         checkpoint.write_text(json.dumps({"submissionStarted": True}))
                         response = await client.post(
@@ -476,6 +490,12 @@ def routes(service, manager):
                     409,
                     "Choose and connect an image provider in AI setup.",
                 )
+        if body.continuationJobId:
+            previous = next((j for j in entries(take_id) if j["id"] == body.continuationJobId), None)
+            if not previous or previous['kind'] != 'video-motion' or previous['state'] != 'succeeded' or previous['input']['aspect'] != body.aspect:
+                raise HTTPException(422, "Choose a completed motion clip from this song and frame shape.")
+            if body.continuationSeconds > previous['input']['seconds']:
+                raise HTTPException(422, "The continuation frame must be inside the previous clip.")
         if body.audioStart is not None:
             with service.store.db() as db:
                 reference = db.execute(
@@ -588,4 +608,6 @@ def routes(service, manager):
             media_type="image/png" if suffix == ".png" else "video/mp4",
         )
 
+    from .music_video import routes as music_video_routes
+    router.include_router(music_video_routes(service, {"start": start, "folder": folder, "entries": entries, "run_process": run_process}))
     return router

@@ -1,4 +1,13 @@
-export type Page = "home" | "music" | "video";
+export type Page = "home" | "music" | "video" | "library";
+export function pageFromPath(path: string): Page {
+  return path === "/home"
+    ? "home"
+    : path === "/video"
+      ? "video"
+      : path === "/library"
+        ? "library"
+        : "music";
+}
 export type Sampling = {
   temperature: number;
   top_p: number;
@@ -258,4 +267,12 @@ export function generationRequest(form: SongForm, requestId: string) {
       },
     })),
   };
+}
+
+/** Keep the first (server-authoritative) copy of each song when merging a cache. */
+export function uniqueTracks(tracks: Track[]): Track[] {
+  const byId = new Map<string, Track>();
+  for (const track of tracks)
+    if (!byId.has(track.id)) byId.set(track.id, track);
+  return [...byId.values()];
 }

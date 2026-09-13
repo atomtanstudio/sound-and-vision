@@ -11,7 +11,7 @@ from .assistance import Assistance, routes as assistance_routes
 from .references import routes as reference_routes
 from .covers import routes as cover_routes, start_cover
 from .library import routes as library_routes
-from .song_import import routes as song_import_routes
+from .song_import import MAX_BYTES as SONG_IMPORT_MAX_BYTES, routes as song_import_routes
 from .video import routes as video_routes
 from .film_review import FilmReviews, routes as film_routes
 
@@ -635,6 +635,10 @@ def create_app(settings=None, start_worker=True):
     app.include_router(song_import_routes(store))
     app.include_router(video_routes(assistance, manager))
     app.include_router(film_routes(films))
+    from .media_library import routes as media_library_routes
+    from .vocal_preview import routes as vocal_preview_routes
+    app.include_router(media_library_routes(store, films))
+    app.include_router(vocal_preview_routes(store))
 
     @app.middleware("http")
     async def protect(request: Request, call_next):
@@ -651,7 +655,8 @@ def create_app(settings=None, start_worker=True):
             return JSONResponse({"detail": "Music video is coming soon. Existing projects are preserved."}, status_code=409)
         length = request.headers.get("content-length")
         max_length = (
-            50 * 1024 * 1024 if request.url.path == "/api/references" else 1024 * 1024
+            SONG_IMPORT_MAX_BYTES if path == "/api/songs/import" else
+            50 * 1024 * 1024 if path == "/api/references" else 1024 * 1024
         )
         if length and (not length.isdigit() or int(length) > max_length):
             return JSONResponse({"detail": "Request too large"}, status_code=413)

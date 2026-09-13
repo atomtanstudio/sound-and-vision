@@ -342,7 +342,7 @@ try {
     "Video handoff",
     "Selected take is carried to the Video shell; soundtrack and format survive navigation.",
   );
-  const musicVideoEnabled = await page.getByLabel("Music video", {exact:true}).isEnabled();
+  const musicVideoEnabled = await page.getByLabel("Lip-sync music video", {exact:true}).isEnabled();
   if (!musicVideoEnabled) {
     assert(await page.getByText("Coming soon", {exact:true}).isVisible());
     await page.goto(base + "/video?film=preserved-project-fixture");
@@ -453,7 +453,7 @@ try {
       return reply(404, { detail: "Video project is in Trash" });
     return reply(200, film);
   });
-  await page.getByLabel("Music video", { exact: true }).check();
+  await page.getByLabel("Lip-sync music video", { exact: true }).check();
   await page
     .getByRole("button", { name: "Render scene", exact: true })
     .waitFor();
