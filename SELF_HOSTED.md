@@ -172,7 +172,7 @@ Writing and image providers are optional for this first test when you supply the
 
 In **Video**, choose **Import song**. WAV, FLAC, MP3, M4A, and OGG are supported, up to 100 MB and 10 minutes. FFmpeg on the backend validates and converts the recording; no music-generation model or reference-transcription runtime is used for import. The original upload is preserved privately, and playback copies are saved in the backend library under **Imported songs**.
 
-For a lyric video, add the song’s lyrics in the editor and align them (alignment still requires its separate runtime). Import does not guess or transcribe lyrics. For a visualizer without words, leave lyrics empty. Imports remain available after reload and support normal library rename, move, and Trash controls.
+For a lyric video, add the song’s lyrics in the editor and align them (alignment still requires its separate runtime). Import itself does not transcribe lyrics. Under **Lyrics & timing**, choose **Transcribe lyrics from song** to isolate the vocal and run local Whisper speech-to-text. Review and edit the draft, then choose **Use reviewed lyrics** and **Align lyrics**. This separate transcription step requires the same local runtime as lyric alignment; it does not use OpenAI. For a visualizer without words, leave lyrics empty. Imports remain available after reload and support normal library rename, move, and Trash controls.
 
 ## If something does not work
 

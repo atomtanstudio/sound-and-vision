@@ -262,6 +262,21 @@ function VideoEditor({
   const alignmentBusy = production.jobs.some(
     (j) => j.kind === "lyric-alignment" && busyJob(j),
   );
+  const transcription = [...production.jobs]
+    .reverse()
+    .find(
+      (j) =>
+        j.kind === "lyric-transcription" &&
+        j.state === "succeeded" &&
+        j.input.language === draft.language,
+    );
+  const transcriptionBusy = production.jobs.some(
+    (j) => j.kind === "lyric-transcription" && busyJob(j),
+  );
+  const [reviewLyrics, setReviewLyrics] = useState("");
+  useEffect(() => {
+    setReviewLyrics(transcription?.result?.lyrics || "");
+  }, [transcription?.id, transcription?.result?.lyrics]);
   const [status, setStatus] = useState("Draft saved in this browser");
   const history = useRef<{ past: VideoDraft[]; future: VideoDraft[] }>({
     past: [],
@@ -1318,10 +1333,80 @@ function VideoEditor({
                   <ChevronDown size={15} />
                 </summary>
                 <div>
+                  <button
+                    className="secondary-button"
+                    disabled={
+                      !production.installed ||
+                      production.submitting ||
+                      transcriptionBusy ||
+                      alignmentBusy
+                    }
+                    onClick={() =>
+                      void production.submit([
+                        {
+                          kind: "transcription",
+                          slot: 0,
+                          aspect: draft.aspect,
+                          seconds: 8,
+                          lyrics: "",
+                          language: draft.language,
+                          prompt: "",
+                        },
+                      ])
+                    }
+                  >
+                    {transcriptionBusy
+                      ? "Transcribing song…"
+                      : "Transcribe lyrics from song"}
+                  </button>
+                  <p className="video-field-note">
+                    Transcribe the recorded vocal, review the draft, then align
+                    the corrected lyrics. Requires the local lyric-alignment
+                    runtime.
+                  </p>
+                  {transcription && (
+                    <div>
+                      <label>
+                        Review transcribed lyrics
+                        <textarea
+                          rows={7}
+                          aria-label="Review transcribed lyrics"
+                          value={reviewLyrics}
+                          onChange={(e) => setReviewLyrics(e.target.value)}
+                        />
+                      </label>
+                      <p className="video-field-note">
+                        Transcription can mishear singing or invent words during
+                        instrumental passages. Listen and correct the draft
+                        before using it.
+                      </p>
+                      {!transcription.result?.lyrics?.trim() && (
+                        <p>
+                          No words were recognized. You can type the lyrics
+                          below.
+                        </p>
+                      )}
+                      <button
+                        className="secondary-button"
+                        disabled={!reviewLyrics.trim()}
+                        onClick={() =>
+                          change({
+                            lyrics: reviewLyrics,
+                            cueEdits: {},
+                            wordEdits: {},
+                          })
+                        }
+                      >
+                        Use reviewed lyrics
+                        {draft.lyrics.trim() ? " (replace current lyrics)" : ""}
+                      </button>
+                    </div>
+                  )}
                   <label>
                     Video lyrics
                     <textarea
                       rows={7}
+                      aria-label="Video lyrics"
                       value={draft.lyrics}
                       onChange={(event) =>
                         change({

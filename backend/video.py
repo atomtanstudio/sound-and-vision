@@ -9,13 +9,13 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 ACTIVE = {"queued", "running", "waiting-for-resource"}
-KINDS = {"video-image", "video-motion", "lyric-alignment"}
+KINDS = {"video-image", "video-motion", "lyric-alignment", "lyric-transcription"}
 
 
 class VideoRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     requestId: str = Field(pattern=r"^[a-zA-Z0-9_-]{8,80}$")
-    kind: Literal["images", "motion", "alignment"]
+    kind: Literal["images", "motion", "alignment", "transcription"]
     slot: int = Field(default=0, ge=0, le=99)
     aspect: Literal["16:9", "9:16"] = "16:9"
     seconds: int | float = Field(default=8, ge=4, le=20)
@@ -49,7 +49,7 @@ def routes(service, manager):
     def entries(take_id):
         with service.store.db() as db:
             rows = db.execute(
-                "SELECT * FROM assistance_jobs WHERE kind IN ('video-image','video-motion','lyric-alignment') AND json_extract(input_json,'$.takeId')=? ORDER BY created_at,id",
+                "SELECT * FROM assistance_jobs WHERE kind IN ('video-image','video-motion','lyric-alignment','lyric-transcription') AND json_extract(input_json,'$.takeId')=? ORDER BY created_at,id",
                 (take_id,),
             ).fetchall()
         return [
@@ -153,9 +153,9 @@ def routes(service, manager):
         }
 
     async def alignment_job(job_id, payload):
-        phase(job_id, "Queued for lyric alignment", "queued")
+        phase(job_id, "Queued for lyric transcription" if payload["kind"] == "transcription" else "Queued for lyric alignment", "queued")
         async with align_limit:
-            phase(job_id, "Separating vocals and aligning words on CPU")
+            phase(job_id, "Separating vocals and transcribing on CPU" if payload["kind"] == "transcription" else "Separating vocals and aligning words on CPU")
             original = service.store.job(payload["takeId"])
             source = service.store.path_for(original["output_key"]) / "audio.flac"
             work = folder(job_id)
@@ -420,13 +420,14 @@ def routes(service, manager):
             "images": "video-image",
             "motion": "video-motion",
             "alignment": "lyric-alignment",
+            "transcription": "lyric-transcription",
         }[payload["kind"]]
         operation = (
             (lambda: image_job(job_id, payload))
             if kind == "video-image"
             else (
                 (lambda: alignment_job(job_id, payload))
-                if kind == "lyric-alignment"
+                if kind in {"lyric-alignment", "lyric-transcription"}
                 else (lambda: motion_job(job_id, payload, resume))
             )
         )
@@ -443,7 +444,7 @@ def routes(service, manager):
             data = entry["input"]
             key = (
                 (entry["kind"], data["slot"], data["aspect"])
-                if data["kind"] != "alignment"
+                if data["kind"] not in {"alignment", "transcription"}
                 else (entry["kind"], data["lyrics"], data["language"])
             )
             latest[key] = entry
@@ -461,8 +462,8 @@ def routes(service, manager):
         take = service.store.job(take_id)
         if take["state"] != "succeeded":
             raise HTTPException(409, "Choose a finished song first.")
-        if body.kind == "alignment":
-            if not body.lyrics.strip():
+        if body.kind in {"alignment", "transcription"}:
+            if body.kind == "alignment" and not body.lyrics.strip():
                 raise HTTPException(422, "Add the song's lyrics before aligning.")
             if not alignment_python.is_file() or not alignment_lock.is_file():
                 raise HTTPException(503, "Lyric alignment is not installed.")

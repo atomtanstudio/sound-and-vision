@@ -131,6 +131,25 @@ def fill_phrase_gaps(windows, offsets, tokens, duration):
     return result, starts
 
 
+def transcript_draft(heard, duration):
+    """Recognition is an editable proposal, never a verified lyric alignment."""
+    lines, current, previous_end = [], [], None
+    for word in heard:
+        text = str(word.get("word", "")).strip()
+        if not text:
+            continue
+        if current and (len(current) >= 9 or (previous_end is not None and word["start"] - previous_end > 0.7)):
+            lines.append(" ".join(current)); current = []
+        current.append(text)
+        previous_end = word["end"]
+    if current:
+        lines.append(" ".join(current))
+    return {"lyrics": "\n".join(lines), "duration": duration, "requiresReview": True,
+            "method": "Demucs vocal isolation + Whisper large-v3 transcription",
+            "reviewCount": sum(w.get("probability", 0) < 0.65 for w in heard),
+            "warning": "Review every line against the song. Singing and instrumental passages can produce incorrect or invented words."}
+
+
 def main(source, work, lock_path):
     import numpy as np
     import soundfile as sf
@@ -143,7 +162,7 @@ def main(source, work, lock_path):
     payload = json.loads((work / "input.json").read_text())
     lock = json.loads(lock_path.read_text())
     lyrics = "\n".join(canonical_lines(payload["lyrics"]))
-    if not lyrics:
+    if not lyrics and payload.get("kind") != "transcription":
         raise ValueError("There are no lyric words to align.")
     progress = work / "phase.json"
     progress.write_text(json.dumps({"phase": "Separating vocals on CPU"}))
@@ -217,6 +236,9 @@ def main(source, work, lock_path):
         temp.write_text(json.dumps(heard))
         temp.replace(transcript_file)
     (work / "transcription.json").write_text(json.dumps(heard))
+    if payload.get("kind") == "transcription":
+        (work / "result.json").write_text(json.dumps(transcript_draft(heard, duration)))
+        return
     lines = canonical_lines(payload["lyrics"])
     tokens = [normalize(w) for line in lines for w in line.split()]
     checks = {}

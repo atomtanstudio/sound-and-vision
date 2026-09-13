@@ -27,6 +27,29 @@ await p.route("**/api/songs/import", async (r) => {
   tracks = [track];
   await r.fulfill({ status: 201, json: track });
 });
+let transcriptJobs = [];
+await p.route("**/api/takes/*/video", async (r) => {
+  if (r.request().method() === "POST") {
+    const input = r.request().postDataJSON();
+    transcriptJobs = [
+      {
+        id: "transcript-test-001",
+        kind: "lyric-transcription",
+        state: "succeeded",
+        input,
+        result: {
+          lyrics: "A misheard line",
+          duration: 93,
+          requiresReview: true,
+        },
+      },
+    ];
+    await r.fulfill({ status: 202, json: transcriptJobs[0] });
+  } else
+    await r.fulfill({
+      json: { jobs: transcriptJobs, alignmentInstalled: true },
+    });
+});
 await p.goto("http://127.0.0.1:5190/video");
 await p
   .getByLabel("Import song", { exact: true })
@@ -57,6 +80,32 @@ await p.waitForFunction(
   () =>
     document.querySelector('select[aria-label="Soundtrack"]')?.value ===
     "abcdef0123456789abcdef0123456789",
+);
+await p.getByText("Lyrics & timing", { exact: false }).first().click();
+await p.getByLabel("Video lyrics", { exact: true }).fill("My existing lyrics");
+await p
+  .getByRole("button", { name: "Transcribe lyrics from song", exact: true })
+  .click();
+await p.getByLabel("Review transcribed lyrics", { exact: true }).waitFor();
+assert.equal(
+  await p.getByLabel("Video lyrics", { exact: true }).inputValue(),
+  "My existing lyrics",
+);
+await p
+  .getByLabel("Review transcribed lyrics", { exact: true })
+  .fill("My corrected line");
+await p
+  .getByRole("button", {
+    name: "Use reviewed lyrics (replace current lyrics)",
+    exact: true,
+  })
+  .click();
+assert.equal(
+  await p.getByLabel("Video lyrics", { exact: true }).inputValue(),
+  "My corrected line",
+);
+console.log(
+  "PASS transcription review does not overwrite lyrics; explicit application uses edited draft",
 );
 await p.setViewportSize({ width: 390, height: 844 });
 await p.screenshot({ path: "/private/tmp/import-ui-mobile.png" });

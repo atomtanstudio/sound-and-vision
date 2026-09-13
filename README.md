@@ -57,7 +57,7 @@ Follow the [step-by-step setup guide](SELF_HOSTED.md). It covers prerequisites, 
 
 ## Bring your own song
 
-Open **Video → Import song** to use an existing WAV, FLAC, MP3, M4A, or OGG recording (up to 100 MB and 10 minutes). It is saved in **Imported songs**, selected as the soundtrack, and available after reload. Add the lyrics in the video editor and align them for kinetic text, or choose a visualizer without lyrics. Importing does not generate or transcribe a song. The experimental music-video option remains Coming soon.
+Open **Video → Import song** to use an existing WAV, FLAC, MP3, M4A, or OGG recording (up to 100 MB and 10 minutes). It is saved in **Imported songs**, selected as the soundtrack, and available after reload. Add the lyrics in the video editor and align them for kinetic text, or choose a visualizer without lyrics. Importing does not generate a song. Under **Lyrics & timing**, choose **Transcribe lyrics from song**, correct the editable draft, and select **Use reviewed lyrics** before alignment. Transcription requires the local lyric-alignment runtime. The experimental music-video option remains Coming soon.
 
 ## Working music flow
 

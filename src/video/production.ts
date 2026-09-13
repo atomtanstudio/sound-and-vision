@@ -26,11 +26,12 @@ export type Alignment = {
 export type VideoJob = {
   created?: number;
   id: string;
-  kind: "video-image" | "video-motion" | "lyric-alignment";
+  kind:
+    "video-image" | "video-motion" | "lyric-alignment" | "lyric-transcription";
   state: string;
   error: string | null;
   input: {
-    kind: BackgroundKind | "alignment";
+    kind: BackgroundKind | "alignment" | "transcription";
     takeId: string;
     slot: number;
     aspect: string;
