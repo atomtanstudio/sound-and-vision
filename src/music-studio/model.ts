@@ -37,7 +37,7 @@ export type Track = {
   cover?: string;
   audio?: 1 | 2;
   audioUrl?: string | null;
-  source?: "yue2";
+  source?: "yue2" | "imported";
   duration?: number;
   status?:
     | "queued"

@@ -168,6 +168,12 @@ FFmpeg must also be on its PATH. The [Playwright dependency installer](https://p
 
 Writing and image providers are optional for this first test when you supply the text yourself. They do not replace the YuE2 music model.
 
+## Use an existing recording
+
+In **Video**, choose **Import song**. WAV, FLAC, MP3, M4A, and OGG are supported, up to 100 MB and 10 minutes. FFmpeg on the backend validates and converts the recording; no music-generation model or reference-transcription runtime is used for import. The original upload is preserved privately, and playback copies are saved in the backend library under **Imported songs**.
+
+For a lyric video, add the song’s lyrics in the editor and align them (alignment still requires its separate runtime). Import does not guess or transcribe lyrics. For a visualizer without words, leave lyrics empty. Imports remain available after reload and support normal library rename, move, and Trash controls.
+
 ## If something does not work
 
 | Symptom | What to check |

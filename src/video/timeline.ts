@@ -75,7 +75,7 @@ export type VideoDraft = {
 export function makeDraft(track: Track): VideoDraft {
   const bookend = Math.min(
     8,
-    (track.source === "yue2" ? track.duration || 0 : 240) / 10,
+    (!!track.source ? track.duration || 0 : 240) / 10,
   );
   return {
     version: 1,

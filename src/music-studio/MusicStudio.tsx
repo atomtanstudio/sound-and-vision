@@ -70,13 +70,15 @@ const projectLabel = (name: string) =>
 const playable = (track: Track) =>
   !track.deletedAt && !!(track.audio || track.audioUrl);
 const duration = (track: Track) =>
-  !playable(track) ? 0 : track.source === "yue2" ? track.duration || 0 : 240;
+  !playable(track) ? 0 : track.source ? track.duration || 0 : 240;
 const takeLabel = (track: Track) =>
-  track.source === "yue2"
-    ? `Take ${track.take || 1}`
-    : `${track.audio === 1 ? "Amber" : "Dusk"} take`;
+  track.source === "imported"
+    ? "Imported song"
+    : track.source === "yue2"
+      ? `Take ${track.take || 1}`
+      : `${track.audio === 1 ? "Amber" : "Dusk"} take`;
 const media = (track: Track, format = "mp3") =>
-  track.source === "yue2"
+  track.source
     ? `/api/takes/${track.id}/files/audio.${format}`
     : `/media/desert-afterglow-${track.audio}.${format}`;
 function IconButton({
@@ -362,7 +364,7 @@ export function MusicStudio() {
         setBackend(status);
         setTracks((previous) => [
           ...library.tracks,
-          ...previous.filter((t) => t.source !== "yue2"),
+          ...previous.filter((t) => !t.source),
         ]);
         setDetail((previous) => {
           const fresh = library.tracks.find((t) => t.id === previous?.id);
@@ -603,7 +605,7 @@ export function MusicStudio() {
     }
   }
   function favorite(track: Track) {
-    if (track.source === "yue2")
+    if (track.source)
       void musicApi
         .patch(track.id, { favorite: !track.favorite })
         .catch((e) => notify(e.message));
@@ -790,10 +792,9 @@ export function MusicStudio() {
     setLibraryBusy(true);
     setLibraryError("");
     try {
-      const saved =
-        detail.source === "yue2"
-          ? await musicApi.patch(detail.id, patch)
-          : { ...detail, ...patch };
+      const saved = detail.source
+        ? await musicApi.patch(detail.id, patch)
+        : { ...detail, ...patch };
       setTracks((previous) =>
         previous.map((t) => (t.id === saved.id ? saved : t)),
       );
@@ -822,9 +823,7 @@ export function MusicStudio() {
       return;
     }
     const ids = new Set(selectedTracks.map((t) => t.id));
-    const remote = selectedTracks
-      .filter((t) => t.source === "yue2")
-      .map((t) => t.id);
+    const remote = selectedTracks.filter((t) => !!t.source).map((t) => t.id);
     libraryMutating.current = true;
     libraryRevision.current++;
     setLibraryBusy(true);
@@ -932,9 +931,7 @@ export function MusicStudio() {
           <div className="pending-art">
             <AudioLines size={34} />
             <span>
-              {track.source === "yue2"
-                ? "No cover yet"
-                : "Cover after generation"}
+              {track.source ? "No cover yet" : "Cover after generation"}
             </span>
           </div>
         )}
@@ -1666,6 +1663,14 @@ export function MusicStudio() {
               </>
             ) : page === "video" ? (
               <VideoWorkspace
+                imported={(track) => {
+                  libraryRevision.current++;
+                  setTracks((old) => [
+                    track,
+                    ...old.filter((t) => t.id !== track.id),
+                  ]);
+                  setVideoSource(track.id);
+                }}
                 tracks={tracks}
                 sourceId={videoSource}
                 chooseSource={setVideoSource}
@@ -2081,7 +2086,7 @@ export function MusicStudio() {
         onEnded={() => setPlaying(false)}
         onError={() =>
           notify(
-            active.source === "yue2"
+            !!active.source
               ? "Audio could not load. Check the music connection."
               : "The sample audio could not load.",
           )
@@ -2118,7 +2123,11 @@ export function MusicStudio() {
               <dl className="metadata">
                 <div>
                   <dt>Image model</dt>
-                  <dd>{account?.provider === "local" ? "Local ComfyUI workflow" : "OpenAI account image generation"}</dd>
+                  <dd>
+                    {account?.provider === "local"
+                      ? "Local ComfyUI workflow"
+                      : "OpenAI account image generation"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Versions</dt>
@@ -2335,11 +2344,13 @@ export function MusicStudio() {
               )}
               <div>
                 <span className="eyebrow">
-                  {detail.source === "yue2"
-                    ? "YUE2 TAKE"
-                    : detail.audio
-                      ? "SAMPLE TRACK"
-                      : "SONG DRAFT"}
+                  {detail.source === "imported"
+                    ? "IMPORTED SONG"
+                    : detail.source === "yue2"
+                      ? "YUE2 TAKE"
+                      : detail.audio
+                        ? "SAMPLE TRACK"
+                        : "SONG DRAFT"}
                 </span>
                 <p>{detail.subtitle}</p>
               </div>
@@ -2535,9 +2546,11 @@ export function MusicStudio() {
             {playable(detail) ? (
               <>
                 <p className="field-note">
-                  {detail.source === "yue2"
-                    ? `YuE2 · ${time(duration(detail))} · 48 kHz stereo.`
-                    : "Original sample instrumental · 4:00 · 24 kHz stereo WAV."}
+                  {detail.source === "imported"
+                    ? `Imported audio · ${time(duration(detail))} · 48 kHz stereo.`
+                    : detail.source === "yue2"
+                      ? `YuE2 · ${time(duration(detail))} · 48 kHz stereo.`
+                      : "Original sample instrumental · 4:00 · 24 kHz stereo WAV."}
                 </p>
                 <div className="detail-actions">
                   <a
@@ -2548,7 +2561,7 @@ export function MusicStudio() {
                     <Download size={16} />
                     WAV
                   </a>
-                  {detail.source === "yue2" && (
+                  {detail.source && (
                     <a
                       className="secondary-button"
                       href={media(detail, "flac")}

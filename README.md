@@ -8,13 +8,13 @@ https://github.com/user-attachments/assets/debae6f5-3119-43a6-b429-c377c6a237c3
 
 ### Example videos
 
-https://github.com/user-attachments/assets/c1f06bdd-1a20-42a5-ae09-94429ac93eb6
+https://github.com/user-attachments/assets/8d0fe391-324f-47b7-8470-38db7cca3125
 
 **Example 1: Kinetic lyric video — 30-second preview**
 
 [Download the full video · 4:25](https://github.com/atomtanstudio/sound-and-vision/releases/download/v0.1.0-rc.1/example-1.mp4)
 
-Animated lyric typography over a visual background.
+Animated lyric typography over graphic backgrounds. This excerpt shows the lyrics in motion.
 
 https://github.com/user-attachments/assets/00cfb259-6bd5-4cb9-8406-b7ac82bf8a69
 
@@ -54,6 +54,10 @@ Start with the [self-hosted installation guide](SELF_HOSTED.md), then [AI setup]
 **One Linux computer is enough:** the app, music backend, and optional local AI providers can all run together. The current music baseline is a compatible NVIDIA GPU with approximately 24 GiB free VRAM.
 
 Follow the [step-by-step setup guide](SELF_HOSTED.md). It covers prerequisites, backend installation, the private local connection, optional AI providers, and your first song. Start there before running `npm run dev`; installing the frontend alone does not install the music backend. A second computer and SSH are optional.
+
+## Bring your own song
+
+Open **Video → Import song** to use an existing WAV, FLAC, MP3, M4A, or OGG recording (up to 100 MB and 10 minutes). It is saved in **Imported songs**, selected as the soundtrack, and available after reload. Add the lyrics in the video editor and align them for kinetic text, or choose a visualizer without lyrics. Importing does not generate or transcribe a song. The experimental music-video option remains Coming soon.
 
 ## Working music flow
 

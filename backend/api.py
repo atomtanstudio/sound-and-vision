@@ -11,6 +11,7 @@ from .assistance import Assistance, routes as assistance_routes
 from .references import routes as reference_routes
 from .covers import routes as cover_routes, start_cover
 from .library import routes as library_routes
+from .song_import import routes as song_import_routes
 from .video import routes as video_routes
 from .film_review import FilmReviews, routes as film_routes
 
@@ -151,9 +152,9 @@ class Store:
             subtitle = f"Take {row['take_index']} · Cancelling"
         return {
             "id": row["id"],
-            "source": "yue2",
+            "source": "imported" if row["stage"] == "imported" else "yue2",
             "title": row["title"],
-            "subtitle": subtitle,
+            "subtitle": "Imported song" if row["stage"] == "imported" else subtitle,
             "project": row["project_name"],
             "favorite": bool(row["favorite"]),
             "created": row["created_at"],
@@ -631,6 +632,7 @@ def create_app(settings=None, start_worker=True):
     app.include_router(reference_routes(assistance, manager))
     app.include_router(cover_routes(assistance))
     app.include_router(library_routes(store))
+    app.include_router(song_import_routes(store))
     app.include_router(video_routes(assistance, manager))
     app.include_router(film_routes(films))
 

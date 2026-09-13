@@ -72,6 +72,7 @@ type AssetPreview = Omit<ImportedAsset, "blob"> & {
   generated?: boolean;
 };
 type Props = {
+  imported: (track: Track) => void;
   tracks: Track[];
   sourceId: string;
   chooseSource: (id: string) => void;
@@ -84,8 +85,7 @@ type Props = {
 };
 const playable = (track: Track) =>
   !track.deletedAt && !!(track.audio || track.audioUrl);
-const length = (track: Track) =>
-  track.source === "yue2" ? track.duration || 0 : 240;
+const length = (track: Track) => (track.source ? track.duration || 0 : 240);
 const musicVideoAvailable = import.meta.env.VITE_ENABLE_MUSIC_VIDEO === "true";
 
 const options = [
@@ -104,12 +104,67 @@ const options = [
   {
     id: "directed",
     title: "Music video",
-    note: musicVideoAvailable ? "A treatment, storyboard and scenes" : "Coming soon",
+    note: musicVideoAvailable
+      ? "A treatment, storyboard and scenes"
+      : "Coming soon",
     icon: Clapperboard,
   },
 ] as const;
 
 export function VideoWorkspace(props: Props) {
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  async function importSong(file?: File) {
+    if (!file || importing) return;
+    if (file.size > 100 * 1024 * 1024) {
+      setImportError("Choose a song smaller than 100 MB.");
+      return;
+    }
+    setImporting(true);
+    setImportError("");
+    try {
+      const response = await fetch("/api/songs/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Filename": encodeURIComponent(file.name),
+        },
+        body: file,
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(
+          typeof data.detail === "string" ? data.detail : "Song import failed.",
+        );
+      props.imported(data);
+    } catch (e) {
+      setImportError((e as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  }
+  const importer = (
+    <div className="song-import-bar">
+      <label className="secondary-button">
+        {importing ? "Importing song…" : "Import song"}
+        <input
+          aria-label="Import song"
+          type="file"
+          accept=".wav,.flac,.mp3,.m4a,.ogg"
+          disabled={importing}
+          onChange={(e) => {
+            void importSong(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+      </label>
+      <span>
+        Use your own audio · WAV, FLAC, MP3, M4A, OGG · up to 100 MB / 10
+        minutes
+      </span>
+      {importError && <p role="alert">{importError}</p>}
+    </div>
+  );
   const tracks = props.tracks.filter(playable);
   const track = tracks.find((t) => t.id === props.sourceId) || tracks[0];
   if (!track)
@@ -117,11 +172,15 @@ export function VideoWorkspace(props: Props) {
       <div className="video-empty">
         <Clapperboard size={32} />
         <h1>Make a video</h1>
-        <p>Choose a finished song from Music to begin.</p>
+        <p>Import an existing song or choose a finished song from Music.</p>
+        {importer}
       </div>
     );
   return (
-    <VideoEditor key={track.id} {...props} tracks={tracks} track={track} />
+    <>
+      <div>{importer}</div>
+      <VideoEditor key={track.id} {...props} tracks={tracks} track={track} />
+    </>
   );
 }
 function restoreDraft(track: Track): VideoDraft {
@@ -619,26 +678,44 @@ function VideoEditor({
             </label>
           ))}
         </fieldset>
-        {!musicVideoAvailable ? <section className="video-coming-soon" aria-label="Music video coming soon">
-          <Clapperboard size={32} />
-          <h2>Music video <span className="coming-soon-tag">Coming soon</span></h2>
-          <p>We’re refining scene generation and character consistency. Existing projects are saved and will be available when this feature returns.</p>
-          <button className="secondary-button" onClick={() => change({ kind: "kinetic" })}>Make a kinetic lyric video</button>
-        </section> : <DirectedVideoWorkspace
-          track={track}
-          tracks={tracks}
-          chooseSource={(id) => {
-            const selected = tracks.find((item) => item.id === id);
-            if (selected)
-              writeLocal(`sv-video-draft-v1:${id}`, {
-                ...restoreDraft(selected),
-                kind: "directed",
-              });
-            chooseSource(id);
-          }}
-          audioRef={audioRef}
-          language={draft.language}
-        />}
+        {!musicVideoAvailable ? (
+          <section
+            className="video-coming-soon"
+            aria-label="Music video coming soon"
+          >
+            <Clapperboard size={32} />
+            <h2>
+              Music video <span className="coming-soon-tag">Coming soon</span>
+            </h2>
+            <p>
+              We’re refining scene generation and character consistency.
+              Existing projects are saved and will be available when this
+              feature returns.
+            </p>
+            <button
+              className="secondary-button"
+              onClick={() => change({ kind: "kinetic" })}
+            >
+              Make a kinetic lyric video
+            </button>
+          </section>
+        ) : (
+          <DirectedVideoWorkspace
+            track={track}
+            tracks={tracks}
+            chooseSource={(id) => {
+              const selected = tracks.find((item) => item.id === id);
+              if (selected)
+                writeLocal(`sv-video-draft-v1:${id}`, {
+                  ...restoreDraft(selected),
+                  kind: "directed",
+                });
+              chooseSource(id);
+            }}
+            audioRef={audioRef}
+            language={draft.language}
+          />
+        )}
       </div>
     );
   return (
@@ -808,7 +885,7 @@ function VideoEditor({
               type="radio"
               name="video-kind"
               aria-label={title}
-                disabled={id === "directed" && !musicVideoAvailable}
+              disabled={id === "directed" && !musicVideoAvailable}
               checked={draft.kind === id}
               onChange={() => change({ kind: id })}
             />
@@ -833,11 +910,13 @@ function VideoEditor({
               {tracks.map((item) => (
                 <option value={item.id} key={item.id}>
                   {item.title} ·{" "}
-                  {item.source === "yue2"
-                    ? `Take ${item.take || 1}`
-                    : item.audio === 1
-                      ? "Amber take"
-                      : "Dusk take"}
+                  {item.source === "imported"
+                    ? "Imported song"
+                    : item.source === "yue2"
+                      ? `Take ${item.take || 1}`
+                      : item.audio === 1
+                        ? "Amber take"
+                        : "Dusk take"}
                 </option>
               ))}
             </select>

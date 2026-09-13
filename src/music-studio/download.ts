@@ -32,14 +32,13 @@ export async function downloadTracks(
       ),
     );
     if (!track.audio && !track.audioUrl) continue;
-    if (format === "flac" && track.source !== "yue2")
+    if (format === "flac" && !track.source)
       throw new Error(
         "Sample tracks have WAV and MP3 downloads. Choose either format for this selection.",
       );
-    const url =
-      track.source === "yue2"
-        ? `/api/takes/${track.id}/files/audio.${format}`
-        : `/media/desert-afterglow-${track.audio}.${format}`;
+    const url = !!track.source
+      ? `/api/takes/${track.id}/files/audio.${format}`
+      : `/media/desert-afterglow-${track.audio}.${format}`;
     const response = await fetch(url, { signal });
     if (!response.ok || !response.body)
       throw new Error(`Could not download “${track.title}”. Please retry.`);

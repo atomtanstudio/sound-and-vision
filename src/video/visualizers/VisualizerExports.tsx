@@ -81,7 +81,7 @@ export function VisualizerExports({
       }
       if (!disposed) timer = setTimeout(poll, 2000);
     };
-    if (track.source === "yue2") void poll();
+    if (!!track.source) void poll();
     return () => {
       disposed = true;
       clearTimeout(timer);
@@ -104,7 +104,7 @@ export function VisualizerExports({
           : `${timingProblems[0]} Adjust it in Word timing, or turn off Show lyrics.`
         : "";
   const issue =
-    track.source !== "yue2" || track.status !== "succeeded"
+    !track.source || track.status !== "succeeded"
       ? "Choose a finished song from your library to render."
       : lyricIssue;
   async function render() {

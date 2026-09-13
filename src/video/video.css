@@ -3,14 +3,76 @@
   max-width: 1520px;
   margin: 0 auto;
 }
-.visualizer-exports{margin:0 0 24px;padding:18px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
-.visualizer-export-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}
-.visualizer-export-heading strong{font-size:14px}.visualizer-export-heading p{font-size:11px;color:var(--muted);margin:6px 0}
-.visualizer-export-jobs{list-style:none;padding:0;margin:14px 0 0}.visualizer-export-jobs li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:13px 0;border-top:1px solid var(--border)}
-.visualizer-export-jobs li>div{min-width:0;flex:1}.visualizer-export-jobs strong,.visualizer-export-jobs span,.visualizer-export-jobs small{display:block;font-size:11px;line-height:1.6}.visualizer-export-jobs span,.visualizer-export-jobs small{color:var(--muted)}
-.visualizer-export-jobs progress{display:block;width:min(100%,420px);height:7px;margin:7px 0;accent-color:var(--accent)}
-.visualizer-export-jobs a{text-decoration:none;white-space:nowrap}
-@media(max-width:600px){.visualizer-export-heading,.visualizer-export-jobs li{align-items:stretch;flex-direction:column}.visualizer-export-jobs a{justify-content:center}}
+.visualizer-exports {
+  margin: 0 0 24px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.visualizer-export-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.visualizer-export-heading strong {
+  font-size: 14px;
+}
+.visualizer-export-heading p {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+.visualizer-export-jobs {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+}
+.visualizer-export-jobs li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 0;
+  border-top: 1px solid var(--border);
+}
+.visualizer-export-jobs li > div {
+  min-width: 0;
+  flex: 1;
+}
+.visualizer-export-jobs strong,
+.visualizer-export-jobs span,
+.visualizer-export-jobs small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.visualizer-export-jobs span,
+.visualizer-export-jobs small {
+  color: var(--muted);
+}
+.visualizer-export-jobs progress {
+  display: block;
+  width: min(100%, 420px);
+  height: 7px;
+  margin: 7px 0;
+  accent-color: var(--accent);
+}
+.visualizer-export-jobs a {
+  text-decoration: none;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .visualizer-export-heading,
+  .visualizer-export-jobs li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .visualizer-export-jobs a {
+    justify-content: center;
+  }
+}
 .video-workspace .sr-only {
   position: absolute;
   width: 1px;
@@ -1050,7 +1112,54 @@
   border-radius: 7px;
 }
 
-.video-kind-switch label:has(input:disabled) { opacity: .58; cursor: default; }
-.video-coming-soon { max-width: 640px; padding: 40px 28px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
-.video-coming-soon p { color: var(--muted); line-height: 1.7; margin: 16px 0 24px; }
-.coming-soon-tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 5px 8px; border-radius: 5px; background: var(--surface); color: var(--muted); vertical-align: middle; }
+.video-kind-switch label:has(input:disabled) {
+  opacity: 0.58;
+  cursor: default;
+}
+.video-coming-soon {
+  max-width: 640px;
+  padding: 40px 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.video-coming-soon p {
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 16px 0 24px;
+}
+.coming-soon-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+.song-import-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.song-import-bar label {
+  position: relative;
+  cursor: pointer;
+}
+.song-import-bar input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.song-import-bar p {
+  color: var(--accent);
+  margin: 0;
+}
