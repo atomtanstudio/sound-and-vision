@@ -60,9 +60,16 @@ def run(spec_path):
             last_update = time.monotonic()
 
     report("loading")
+    matched = (spec.get("engine") or {}).get("name") == "ai-toolkit-yue2"
+    if matched:
+        # Use the app's pinned plan/export format in the isolated inference runtime.
+        from .lora_runtime import load_artifact_runtime
+
+        load_artifact_runtime(spec["engine"]["native_source"])
     import numpy as np
     import soundfile as sf
     import torch
+    from .audio_cleanup import trim_quiet_tail
     from yue2 import YuE2Pipeline, SymbolicPlan
     from yue2.pipeline import SongResult
     from yue2.protocol import GenerationConfig, SongRequest
@@ -70,17 +77,34 @@ def run(spec_path):
 
     torch.cuda.reset_peak_memory_stats()
     config = GenerationConfig.from_dict(spec["generation"])
-    with YuE2Pipeline.from_pretrained(
-        spec["model"],
-        vae=spec["vae"],
-        device="cuda",
-        local_files_only=True,
-        generation_config=config,
-        memory_budget_gib=24,
-        backend="torch",
-        quantization="none",
-        progress=True,
-    ) as pipe:
+    if matched:
+        from .toolkit_inference import ToolkitPipeline
+
+        pipeline = ToolkitPipeline(spec, config, cancelled)
+    else:
+        pipeline = YuE2Pipeline.from_pretrained(
+            spec["model"],
+            vae=spec["vae"],
+            device="cuda",
+            local_files_only=True,
+            generation_config=config,
+            memory_budget_gib=24,
+            backend="torch",
+            quantization="none",
+            progress=True,
+        )
+    with pipeline as pipe:
+        adapter = getattr(pipe, "adapter", None)
+        if spec.get("lora") and not matched:
+            from .loras import merge_adapter
+
+            selected = spec["lora"]
+            adapter = {**selected, **merge_adapter(
+                pipe._load_model(), spec["lora_path"], selected["sha256"], selected["strength"]
+            )}
+            pipe.weights["lora"] = adapter
+        if adapter:
+            write_json(out / "lora.json", adapter)
         request = SongRequest(**spec["song"])
         # Fail promptly rather than entering native sampling with an oversized prompt.
         if (
@@ -125,6 +149,7 @@ def run(spec_path):
         audio = pipe.decode(latents)
         if cancelled():
             raise InterruptedError("Cancelled")
+        audio, cleanup = trim_quiet_tail(audio, 48000)
         timing = {
             "abc": plan.timing,
             "semantic": semantic.timing,
@@ -188,6 +213,11 @@ def run(spec_path):
             raise ValueError("Decoded audio is effectively silent; artifacts retained.")
         clipping = float(np.mean(np.abs(audio) >= 0.9999))
         warnings = []
+        if cleanup.get("trimmed"):
+            warnings.append(
+                "Removed a sustained low-volume continuation after the detected musical ending "
+                f"({cleanup['trimmed_seconds']:.1f} seconds)."
+            )
         if any(song.truncated.values()):
             warnings.append(
                 "Model reached a token limit; listen for an incomplete ending."
@@ -228,12 +258,14 @@ def run(spec_path):
             "clipped_fraction": clipping,
             "truncated": song.truncated,
             "warnings": warnings,
+            "audio_cleanup": cleanup,
             "timing": timing,
             "peak_vram_allocated_bytes": torch.cuda.max_memory_allocated(),
             "peak_vram_reserved_bytes": torch.cuda.max_memory_reserved(),
             "source_revision": spec["source_revision"],
             "model_revision": spec["model_revision"],
             "vae_revision": spec["vae_revision"],
+            "lora": adapter,
             "torch": torch.__version__,
             "artifacts": {
                 p.name: {"sha256": sha(p), "bytes": p.stat().st_size}
@@ -243,6 +275,14 @@ def run(spec_path):
                 and p.name not in {"progress.json", "spec.json"}
             },
         }
+        if matched:
+            engine = pipe.engine_metadata
+            record.update(
+                engine=engine,
+                source_revision=engine["source_revision"],
+                model_revision="sha256:" + engine["checkpoint_sha256"],
+                vae_revision="embedded:" + engine["checkpoint_sha256"],
+            )
         write_json(out / "delivery.json", record)
         report("complete")
 

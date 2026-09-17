@@ -13,6 +13,13 @@ import {
   byteRange,
   createVisualizerExports,
 } from "./video/visualizer-export-api.mjs";
+import {
+  normalizeAudioEnd,
+  normalizeAudioFade,
+  audioFadeGain,
+  ffmpegAudioFadeFilter,
+  retimeAudioFade,
+} from "../src/video/audioFade.ts";
 
 const input = () => ({
   takeId: "a".repeat(32),
@@ -104,6 +111,44 @@ test("render validation keeps supported controls and rejects arbitrary source pa
   assert.equal(validateExport(lyrics).cues[0].words.length, 2);
   lyrics.cues[0].words[0].start = null;
   assert.throws(() => validateExport(lyrics), /word start/);
+});
+test("audio fade validation and preview/export curves agree", () => {
+  const fade = normalizeAudioFade(
+    { start: 90, end: 100, curve: "smooth" },
+    100,
+  );
+  assert.deepEqual(fade, { start: 90, end: 100, curve: "smooth" });
+  assert.equal(audioFadeGain(fade, 89), 1);
+  assert.equal(audioFadeGain(fade, 100), 0);
+  assert.match(ffmpegAudioFadeFilter(fade, 100), /curve=hsin/);
+  assert.equal(normalizeAudioFade({ start: 100, end: 100 }, 100), null);
+  assert.deepEqual(normalizeAudioFade({ start: 99.75, end: 100 }, 100), {
+    start: 99.75,
+    end: 100,
+    curve: "smooth",
+  });
+  const body = input();
+  body.draft.audioFade = fade;
+  assert.deepEqual(validateExport(body).draft.audioFade, fade);
+  body.draft.audioFade = { start: 0, end: 0.1, curve: "smooth" };
+  assert.throws(() => validateExport(body), /Invalid audio fade/);
+});
+test("soundtrack trim endpoints and fade retiming reach digital silence together", () => {
+  assert.equal(normalizeAudioEnd(100, 100), null);
+  assert.equal(normalizeAudioEnd(99.9, 100), 99.9);
+  assert.equal(normalizeAudioEnd(0.5, 100), null);
+  assert.deepEqual(
+    retimeAudioFade({ start: 90, end: 100, curve: "smooth" }, 60),
+    {
+      start: 50,
+      end: 60,
+      curve: "smooth",
+    },
+  );
+  assert.match(
+    ffmpegAudioFadeFilter({ start: 55, end: 60, curve: "smooth" }, 60),
+    /afade=.*st=55.*d=5.*atrim=duration=60/,
+  );
 });
 test("local render mutations reject cross-site and hostile Host requests", () => {
   assert(

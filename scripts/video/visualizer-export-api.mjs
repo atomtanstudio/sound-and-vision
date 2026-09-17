@@ -16,6 +16,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { visualizerSchedule } from "../../src/video/visualizers/schedule.ts";
+import { normalizeAudioFade } from "../../src/video/audioFade.ts";
 
 const ACTIVE = new Set(["queued", "running"]);
 const takePattern = /^[a-f0-9]{32}$/;
@@ -91,6 +92,9 @@ export function validateExport(body) {
     draft[field] = input[field];
   }
   const duration = number(body.duration, 1, 3600, "song duration");
+  const audioFade = normalizeAudioFade(input.audioFade, duration);
+  if (input.audioFade != null && !audioFade) throw Error("Invalid audio fade");
+  draft.audioFade = audioFade;
   if (!Array.isArray(body.cues) || body.cues.length > 1500)
     throw Error("Invalid lyric timing");
   const cues = draft.showLyrics
@@ -356,21 +360,28 @@ export function createVisualizerExports({
           { encoding: "utf8", timeout: 15000 },
         ),
       );
-      const duration = number(
+      const sourceDuration = number(
         Number(info.format.duration),
         1,
         3600,
         "recording duration",
       );
-      if (Math.abs(duration - job.input.duration) > 0.25)
+      if (job.input.duration > sourceDuration + 0.25)
         throw Error(
-          "The recording duration changed. Refresh the song and render again.",
+          "The requested render is longer than the recording. Refresh the song and render again.",
         );
+      const duration = number(
+        Math.min(job.input.duration, sourceDuration),
+        1,
+        sourceDuration,
+        "song duration",
+      );
       const width = job.input.draft.aspect === "9:16" ? 1080 : 1920,
         height = job.input.draft.aspect === "9:16" ? 1920 : 1080;
       atomic(join(work, "config.json"), {
         ...job.input,
         title: job.title,
+        sourceDuration,
         duration,
         width,
         height,

@@ -443,7 +443,7 @@ class FilmReviews:
 
     async def run(self,film_id,job_id):
         work=self.folder(film_id)/'jobs'/job_id
-        acquired=False;process=None
+        acquired=False;process=None;used_video_gpu=False
         try:
             data=read(work/'input.json');scene=data['kind']=='scene'
             smart=scene and data.get('method')=='smart'
@@ -510,7 +510,7 @@ class FilmReviews:
                     while not self.manager.gpu_lock.acquire(blocking=False):
                         self.update_job(film_id,job_id,'waiting-for-resource','Waiting for the current music or video job')
                         await asyncio.sleep(3)
-                    acquired=True
+                    acquired=True;used_video_gpu=True
                 self.update_job(film_id,job_id,'running','Preparing scene' if scene else 'Assembling selected takes')
                 with (work/'worker.log').open('ab') as output:
                     process=await asyncio.create_subprocess_exec(sys.executable,'-m','backend.film_worker',str(work),
@@ -552,6 +552,8 @@ class FilmReviews:
                 try:await asyncio.wait_for(process.wait(),8)
                 except asyncio.TimeoutError:
                     process.kill();await process.wait()
+            if used_video_gpu and not any(job['id'] != job_id for _, _, job in self.pending(True)):
+                self.manager.request_video_cleanup('scene:' + job_id)
             if acquired:self.manager.gpu_lock.release()
             self.tasks.pop((film_id,job_id),None)
             self.dispatch()

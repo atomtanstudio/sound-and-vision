@@ -3,6 +3,7 @@ import { Download, Film, WandSparkles } from "lucide-react";
 import { readLocal, writeLocal, type Track } from "../music-studio/model";
 import { request } from "../music-studio/api";
 import { timeLabel, lyricTimingReview, type LyricRenderCue } from "./timeline";
+import type { AudioFade } from "./audioFade";
 
 type Config = {
   theme: string;
@@ -40,19 +41,23 @@ const active = (job: MovieJob) =>
 
 export function MusicVideoCreator({
   track,
+  duration,
   lyrics,
   language,
   aspect,
   cues,
+  audioFade,
   lyricControls,
   onAspect,
   timingEditor,
 }: {
   track: Track;
+  duration: number;
   lyrics: string;
   language: string;
   aspect: "16:9" | "9:16";
   cues: LyricRenderCue[];
+  audioFade: AudioFade | null;
   lyricControls: ReactNode;
   onAspect: (aspect: "16:9" | "9:16") => void;
   timingEditor: ReactNode;
@@ -87,7 +92,6 @@ export function MusicVideoCreator({
   const rendering = jobs.some(
     (j) => j.kind === "song-video-render" && active(j),
   );
-  const duration = track.duration || 0;
   const overlap = config.join === "dissolve" ? 0.5 : 0;
   const fullCount = Math.max(
     1,
@@ -101,7 +105,7 @@ export function MusicVideoCreator({
   const hasTimingGaps =
     config.showLyrics && cues.length > 0 && timing.omitted > 0;
   const timingBlocked = hasTimingGaps && (!omitUnusableWords || !timing.usable);
-  const inputs = { ...config, lyrics, language, aspect };
+  const inputs = { ...config, lyrics, language, aspect, duration };
   const matches =
     planJob?.state === "succeeded" &&
     Object.entries(inputs).every(
@@ -481,6 +485,7 @@ export function MusicVideoCreator({
                 cues: config.showLyrics ? cues : [],
                 lyrics,
                 omitUnusableWords: config.showLyrics && omitUnusableWords,
+                audioFade,
               })
             }
           >

@@ -1,5 +1,33 @@
 {
   "$defs": {
+    "LoraSelection": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-f0-9]{32}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "strength": {
+          "default": 1,
+          "maximum": 2,
+          "minimum": 0.1,
+          "title": "Strength",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "sha256"
+      ],
+      "title": "LoraSelection",
+      "type": "object"
+    },
     "Sampling": {
       "additionalProperties": false,
       "properties": {
@@ -172,6 +200,17 @@
           ],
           "default": null,
           "title": "Sourcetakeid"
+        },
+        "lora": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoraSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "writingTask": {
           "default": "Draft lyrics",

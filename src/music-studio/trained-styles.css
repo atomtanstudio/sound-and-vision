@@ -1,0 +1,142 @@
+.trained-styles {
+  margin-top: 17px;
+  min-width: 0;
+}
+.trained-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.trained-heading .icon-button {
+  width: 26px;
+  height: 26px;
+}
+.trained-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  color: var(--muted);
+}
+.trained-select > svg {
+  flex-shrink: 0;
+}
+.trained-select select {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  border: 0;
+  padding: 10px 22px 10px 0;
+  font-size: 12px;
+  background-color: transparent;
+  color: var(--ink);
+}
+.lora-style {
+  --lora-ink: #66528a;
+  --lora-bg: #f0ebf7;
+}
+.lora-artist {
+  --lora-ink: #8c5b22;
+  --lora-bg: #fbefdf;
+}
+html[data-theme="dark"] .lora-style {
+  --lora-ink: #ccb4f1;
+  --lora-bg: #342c41;
+}
+html[data-theme="dark"] .lora-artist {
+  --lora-ink: #efc188;
+  --lora-bg: #3e3023;
+}
+.trained-select.lora-style,
+.trained-select.lora-artist {
+  color: var(--lora-ink);
+}
+.trained-kind,
+.lora-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--lora-ink);
+  background: var(--lora-bg);
+  padding: 4px 7px;
+  border-radius: 4px;
+}
+.trained-kind {
+  margin-right: 8px;
+}
+.lora-badge {
+  margin-top: 5px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.lora-badge > svg {
+  flex-shrink: 0;
+}
+.trained-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  gap: 9px;
+  margin-top: 9px;
+}
+.trained-controls label {
+  min-width: 0;
+  font-size: 10px;
+  color: var(--muted);
+}
+.trained-controls select,
+.trained-controls input {
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px;
+  min-height: 34px;
+  font-size: 12px;
+}
+.trained-controls select {
+  padding-right: 22px;
+}
+.trained-note {
+  margin: 7px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.trained-note code {
+  overflow-wrap: anywhere;
+}
+.trained-error {
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.trained-folder {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.trained-folder summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  width: fit-content;
+}
+.trained-folder p {
+  line-height: 1.6;
+}
+.trained-path {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 8px;
+  background: var(--surface);
+  border-radius: 5px;
+  user-select: all;
+}

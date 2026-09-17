@@ -108,7 +108,14 @@ def compose(work, data):
         if (fonts/'SV-Manrope.ttf').is_file():
             (work/'fonts').mkdir(exist_ok=True); shutil.copyfile(fonts/'SV-Manrope.ttf', work/'fonts/SV-Manrope.ttf')
         video = ['-vf', 'ass=lyrics.ass:fontsdir=fonts', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-threads', '4', '-pix_fmt', 'yuv420p']
-    run([*prefix, '-f', 'concat', '-safe', '0', '-i', 'sequence.ffconcat', '-i', data['audio'], '-map', '0:v:0', '-map', '1:a:0', *video, '-frames:v', plan['frames'], '-t', plan['duration'], '-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', 'movie.partial.mp4'], work)
+    audio_filter = f'atrim=duration={plan["duration"]},asetpts=PTS-STARTPTS'
+    fade = data.get('audioFade')
+    if fade:
+        curve = 'tri' if fade.get('curve') == 'linear' else 'hsin'
+        audio_filter = (f'afade=t=out:st={float(fade["start"])}:'
+                        f'd={max(.25, float(fade["end"]) - float(fade["start"]))}:'
+                        f'curve={curve},' + audio_filter)
+    run([*prefix, '-f', 'concat', '-safe', '0', '-i', 'sequence.ffconcat', '-i', data['audio'], '-map', '0:v:0', '-map', '1:a:0', *video, '-frames:v', plan['frames'], '-t', plan['duration'], '-af', audio_filter, '-c:a', 'aac', '-b:a', '320k', '-movflags', '+faststart', 'movie.partial.mp4'], work)
     info = probe(work/'movie.partial.mp4'); stream = next(s for s in info['streams'] if s['codec_type'] == 'video')
     if abs(float(stream.get('duration', 0)) - plan['duration']) > 1/fps + .005 or int(stream['nb_frames']) != plan['frames']:
         raise ValueError('The export did not cover the full song. Source clips are retained.')

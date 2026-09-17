@@ -48,6 +48,7 @@ class PlanRequest(BaseModel):
     lyrics: str = Field(default='', max_length=30000)
     language: str = Field(default='en', pattern=r'^[a-z]{2,3}$')
     showLyrics: bool = False
+    duration: float | None = Field(default=None, ge=1, le=600, allow_inf_nan=False)
 
 
 class ThemeRequest(BaseModel):
@@ -67,6 +68,13 @@ class Cue(BaseModel):
     words: list[Word] = Field(min_length=1, max_length=200)
 
 
+class AudioFade(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    start: float = Field(ge=0, allow_inf_nan=False)
+    end: float = Field(ge=0, allow_inf_nan=False)
+    curve: Literal['linear', 'smooth'] = 'smooth'
+
+
 class RenderRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     requestId: str = Field(pattern=r'^[a-zA-Z0-9_-]{8,80}$')
@@ -74,6 +82,7 @@ class RenderRequest(BaseModel):
     cues: list[Cue] = Field(default_factory=list, max_length=2000)
     omitUnusableWords: bool = False
     lyrics: str | None = Field(default=None, max_length=30000)
+    audioFade: AudioFade | None = None
 
 
 def schedule(duration, seconds=15, join='dissolve', count=None):
@@ -180,7 +189,10 @@ def routes(service, ops):
     @router.post('/takes/{take_id}/music-video/plan', status_code=202)
     async def plan(take_id: str, body: PlanRequest):
         _, duration, form = take(take_id)
-        timing = schedule(duration, body.clipSeconds, body.join, body.clipCount if body.coverage == 'repeat' else None)
+        requested_duration = duration if body.duration is None else min(body.duration, duration)
+        if requested_duration < 1:
+            raise HTTPException(422, 'The trim point must leave at least one second of audio.')
+        timing = schedule(requested_duration, body.clipSeconds, body.join, body.clipCount if body.coverage == 'repeat' else None)
         payload = {**body.model_dump(exclude={'requestId'}), 'takeId': take_id}
         async def run():
             scenes = []
@@ -227,7 +239,7 @@ def routes(service, ops):
         if job['state'] != 'succeeded': raise ValueError(job.get('error') or f'{key} stopped. Retry to continue this video.')
         return job_id, job['result']
 
-    async def render(job_id, data):
+    async def render_work(job_id, data):
         plan_id = data['planId']; folder = work(plan_id)
         plan = json.loads((folder/'plan.json').read_text())
         # Text-only corrections reuse the reviewed scenes and completed clips.
@@ -235,6 +247,9 @@ def routes(service, ops):
         if data.get('lyrics') is not None:
             plan['lyrics'] = data['lyrics']
         audio_folder, duration, _ = take(data['takeId'])
+        output_duration = float(plan['duration'])
+        if output_duration > duration + .05:
+            raise ValueError('The saved plan is longer than the recording. Prepare it again.')
         checkpoint = folder/'children.json'
         stop = folder/'stop'
         async with render_limit:
@@ -248,7 +263,7 @@ def routes(service, ops):
                     _, result = await child(job_id, {'kind': 'alignment', 'takeId': data['takeId'], 'slot': 0, 'aspect': plan['aspect'], 'seconds': 8, 'lyrics': plan['lyrics'], 'language': plan['language'], 'prompt': ''}, checkpoint, 'Aligning lyrics')
                     cues = result['cues']
                 original_words = sum(len(c['words']) for c in cues)
-                cues = validate_cues(cues, duration, plan['lyrics'], data.get('omitUnusableWords', False))
+                cues = validate_cues(cues, output_duration, plan['lyrics'], data.get('omitUnusableWords', False))
                 omitted_words = original_words - sum(len(c['words']) for c in cues)
             clips = []
             for index, scene in enumerate(plan['scenes']):
@@ -262,16 +277,27 @@ def routes(service, ops):
                 clips.append({'id': clip_id, 'path': str(ops['folder'](clip_id)/'background.mp4')})
             if stopped(): raise asyncio.CancelledError()
             export = folder/'exports'/job_id; export.mkdir(parents=True, exist_ok=True)
-            atomic(export/'input.json', {'plan': plan, 'clips': clips, 'cues': cues if plan['showLyrics'] else [], 'audio': str(audio_folder/'audio.flac')})
+            atomic(export/'input.json', {'plan': plan, 'clips': clips, 'cues': cues if plan['showLyrics'] else [], 'audio': str(audio_folder/'audio.flac'), 'audioFade': data.get('audioFade')})
             phase(job_id, 'Assembling the full video and original soundtrack')
             await ops['run_process']([sys.executable, Path(__file__).with_name('music_video_render.py'), export], export, 7200, job_id=job_id)
-            return {'phase': 'Video ready', 'clipCount': len(clips), 'duration': duration, 'omittedLyricWords': omitted_words,
+            return {'phase': 'Video ready', 'clipCount': len(clips), 'duration': float(plan['duration']), 'omittedLyricWords': omitted_words,
                     'videoUrl': f'/api/music-video/jobs/{job_id}/media', 'downloadUrl': f'/api/music-video/jobs/{job_id}/media?download=1'}
+
+    async def render(job_id, data):
+        try:
+            return await render_work(job_id, data)
+        finally:
+            # Also runs on failure/cancellation; the manager defers until H3 is idle.
+            ops['release_gpu']('music-video:' + job_id)
 
     @router.post('/takes/{take_id}/music-video/render', status_code=202)
     async def submit_render(take_id: str, body: RenderRequest):
         row, _ = saved(body.planId, 'song-video-plan', take_id)
         if row['state'] != 'succeeded': raise HTTPException(409, 'Finish preparing the plan first.')
+        _, duration, _ = take(take_id)
+        plan_duration = float(json.loads(row['result_json']).get('duration', duration))
+        if body.audioFade and (body.audioFade.end <= body.audioFade.start or body.audioFade.end - body.audioFade.start < .25 or body.audioFade.end > plan_duration + .05):
+            raise HTTPException(422, 'Audio fade must last at least 0.25 seconds and end within the recording.')
         from .music_video_render import requirements
         try:
             await asyncio.to_thread(requirements, json.loads(row['result_json'])['showLyrics'])

@@ -1,6 +1,7 @@
 import type { Alignment } from "./production";
 import type { Track } from "../music-studio/model";
 import { visualizerSchedule } from "./visualizers/schedule.ts";
+import type { AudioFade } from "./audioFade";
 
 export const FPS = 24;
 export type VideoKind = "kinetic" | "visualizer" | "directed" | "cinematic";
@@ -38,6 +39,8 @@ export type VideoDraft = {
   lyrics: string;
   intro: number;
   outro: number;
+  audioEnd: number | null;
+  audioFade: AudioFade | null;
   cueEdits: Record<string, { startFrame: number; endFrame: number }>;
   lyricMotion:
     "auto" | "pop" | "slam" | "rise" | "highlight" | "reveal" | "calm";
@@ -93,6 +96,8 @@ export function makeDraft(track: Track): VideoDraft {
     lyrics: track.form?.lyrics || "",
     intro: bookend,
     outro: bookend,
+    audioEnd: null,
+    audioFade: null,
     cueEdits: {},
     lyricMotion: "auto",
     motionVersion: 2,
@@ -242,15 +247,22 @@ export function alignedCues(
       },
     ];
   });
+  const edited = cues.map((cue) => {
+    const edit = draft.cueEdits[cue.id];
+    return edit
+      ? { ...cue, startFrame: edit.startFrame, endFrame: edit.endFrame }
+      : cue;
+  });
   // Adjacent words can share a video frame or slightly overlap in the vocal.
   // Hand off the displayed line at the next line's start without changing any
   // measured word timestamps. Larger conflicts still require review.
-  return cues.map((cue, i) => {
-    const next = cues[i + 1];
+  return edited.map((cue, i) => {
+    const next = edited[i + 1];
     return next &&
       next.startFrame > cue.startFrame &&
       cue.endFrame > next.startFrame &&
-      cue.endFrame - next.startFrame <= 3
+      cue.endFrame - next.startFrame <= 3 &&
+      !draft.cueEdits[cue.id]
       ? { ...cue, endFrame: next.startFrame }
       : cue;
   });
@@ -355,6 +367,8 @@ export function videoManifest(
       takeId: track.id,
       useOriginal: true,
       muteBackgroundAudio: true,
+      trimEnd: draft.audioEnd,
+      fadeOut: draft.audioFade,
     },
     background: {
       kind: draft.kind === "visualizer" ? "procedural" : draft.background,
@@ -408,6 +422,7 @@ export function videoManifest(
       textColor: draft.textColor,
       highlightColor: draft.highlightColor,
       shade: draft.shade,
+      cueEdits: draft.cueEdits,
     },
     visualizer: {
       style: draft.visualizer,

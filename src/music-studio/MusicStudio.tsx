@@ -8,6 +8,7 @@ import {
   type AccountStatus,
 } from "./Assistance";
 import { musicApi, type BackendStatus } from "./api";
+import { TrainedStyles, LoraBadge } from "./TrainedStyles";
 import { useLibrarySelection } from "./selection";
 import { VideoWorkspace } from "../video/VideoWorkspace";
 import { MediaLibrary } from "./MediaLibrary";
@@ -321,6 +322,27 @@ export function MusicStudio() {
     ...initialForm,
     ...readLocal<Partial<SongForm>>("sv-form-v2", {}),
   }));
+  useEffect(() => {
+    // Undo the temporary duration selector and the original LoRA preview cap.
+    // Keep the rest of the draft and retain later Advanced sampling edits.
+    if (readLocal("sv-song-length-restored-v2", false)) return;
+    writeLocal("sv-song-length-restored-v2", true);
+    setForm((current) =>
+      [3000, 6000, 12000].includes(current.semantic.max_tokens)
+        ? {
+            ...current,
+            semantic: {
+              ...current.semantic,
+              min_tokens: Math.min(
+                current.semantic.min_tokens,
+                initialForm.semantic.max_tokens,
+              ),
+              max_tokens: initialForm.semantic.max_tokens,
+            },
+          }
+        : current,
+    );
+  }, []);
   const [tracks, setTracks] = useState<Track[]>(() =>
     uniqueTracks(readLocal("sv-library-v2", initialTracks)),
   );
@@ -977,6 +999,15 @@ export function MusicStudio() {
           {track.title}
         </button>
         <p>{track.subtitle}</p>
+        {track.lora && <LoraBadge lora={track.lora} />}
+        {track.truncated?.semantic && (
+          <span
+            className="track-limit-warning"
+            title="The model did not signal an ending before reaching its generation safety ceiling."
+          >
+            Length limit reached
+          </span>
+        )}
         {view === "list" && (
           <span className="list-project">{projectLabel(track.project)}</span>
         )}
@@ -1233,6 +1264,11 @@ export function MusicStudio() {
                         ),
                       )}
                     </div>
+                    <TrainedStyles
+                      form={form}
+                      change={setForm}
+                      connected={!!backend}
+                    />
                     <WritingAssistant
                       simple
                       openRequest={writingRequest}
@@ -1317,6 +1353,11 @@ export function MusicStudio() {
                         if (!e.target.value) update("description", "");
                       }}
                       placeholder="Genre, instruments, vocal character, language…"
+                    />
+                    <TrainedStyles
+                      form={form}
+                      change={setForm}
+                      connected={!!backend}
                     />
                     <label>
                       Genre
@@ -1707,6 +1748,7 @@ export function MusicStudio() {
                 currentId={current}
                 playing={playing}
                 progress={progress}
+                volume={volume}
                 audioRef={audio}
                 play={listen}
                 seek={seekVideo}
@@ -2385,6 +2427,15 @@ export function MusicStudio() {
                 <p>{detail.subtitle}</p>
               </div>
             </div>
+            {detail.lora && (
+              <div>
+                <LoraBadge lora={detail.lora} />
+                <p className="field-note">
+                  Strength {detail.lora.strength} · Trigger{" "}
+                  {detail.lora.trigger || "none"}
+                </p>
+              </div>
+            )}
             <label>
               Title
               <input

@@ -21,6 +21,13 @@ class Sampling(BaseModel):
         return self
 
 
+class LoraSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    strength: float = Field(default=1, ge=0.1, le=2)
+
+
 class SongForm(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     description: str = Field(default="", max_length=20000)
@@ -50,6 +57,7 @@ class SongForm(BaseModel):
     genre: str = Field(default="", max_length=80)
     referenceId: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
     sourceTakeId: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
+    lora: LoraSelection | None = None
     writingTask: str = Field(default="Draft lyrics", max_length=100)
     writingPrompt: str = Field(default="", max_length=20000)
 

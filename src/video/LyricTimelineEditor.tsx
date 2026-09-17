@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { Alignment } from "./production";
 import {
+  FPS,
   lyricRenderCues,
   lyricTimingReview,
   type VideoDraft,
@@ -27,6 +28,7 @@ import {
   lineBounds,
   lyricProblems,
   moveLyricLine,
+  resizeLyricLine,
   precision,
   tappedLyricLine,
   deleteLyricText,
@@ -38,11 +40,18 @@ import { WordTimingEditor } from "./WordTimingEditor";
 import { LyricPhraseForm, type PhraseSource } from "./LyricPhraseForm";
 import { LyricTimingPreview } from "./LyricTimingPreview";
 import { VocalPreview } from "./VocalPreview";
+import {
+  normalizeAudioEnd,
+  normalizeAudioFade,
+  retimeAudioFade,
+  type AudioFade,
+} from "./audioFade";
 
 type Props = {
   alignment: Alignment;
   draft: VideoDraft;
   duration: number;
+  sourceDuration: number;
   audioUrl: string;
   audioRef: RefObject<HTMLAudioElement | null>;
   audioActive: boolean;
@@ -57,10 +66,415 @@ type Props = {
   canUndo: boolean;
   canRedo: boolean;
 };
-const stamp = (t: number) =>
-  `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, "0")}`;
+const stamp = (t: number) => {
+  const hundredths = Math.max(0, Math.round(Math.max(0, t) * 100));
+  const minutes = Math.floor(hundredths / 6000);
+  const seconds = Math.floor((hundredths % 6000) / 100);
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(
+    hundredths % 100,
+  ).padStart(2, "0")}`;
+};
 const clamp = (v: number, min: number, max: number) =>
   Math.max(min, Math.min(max, v));
+
+type AudioFadeLaneProps = {
+  fade: AudioFade | null;
+  start: number;
+  span: number;
+  duration: number;
+  disabled?: boolean;
+  onChange: (fade: AudioFade | null) => void;
+  onFocus: () => void;
+};
+
+type AudioTrimLaneProps = {
+  sourceDuration: number;
+  trimEnd: number | null;
+  position: number;
+  disabled?: boolean;
+  onChange: (trimEnd: number | null) => void;
+};
+
+function AudioTrimLane({
+  sourceDuration,
+  trimEnd,
+  position,
+  disabled,
+  onChange,
+}: AudioTrimLaneProps) {
+  const lane = useRef<HTMLDivElement>(null);
+  const full = Math.max(0.25, sourceDuration);
+  const minimum = Math.min(1, full);
+  const drag = useRef<{ x: number; width: number; initial: number } | null>(
+    null,
+  );
+  const [preview, setPreview] = useState(trimEnd ?? full);
+  useEffect(() => {
+    if (!drag.current) setPreview(trimEnd ?? full);
+  }, [trimEnd, full]);
+  const effective = clamp(preview, minimum, full);
+  const percent = (time: number) => clamp((time / full) * 100, 0, 100);
+  const stampTrim = (time: number) => stamp(time);
+  const trimValue = (time: number) =>
+    time >= full - 0.05 ? null : normalizeAudioEnd(time, full);
+  function candidate(event: PointerEvent<HTMLElement>) {
+    const current = drag.current;
+    if (!current) return null;
+    const next = clamp(
+      current.initial +
+        ((event.clientX - current.x) / Math.max(1, current.width)) * full,
+      minimum,
+      full,
+    );
+    return next;
+  }
+  function begin(event: PointerEvent<HTMLElement>) {
+    if (disabled || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = {
+      x: event.clientX,
+      width: lane.current?.clientWidth || 1,
+      initial: effective,
+    };
+    setPreview(effective);
+  }
+  function move(event: PointerEvent<HTMLElement>) {
+    const next = candidate(event);
+    if (next !== null) setPreview(next);
+  }
+  function finish(event: PointerEvent<HTMLElement>) {
+    const current = drag.current;
+    const next = candidate(event);
+    const moved = current && Math.abs(event.clientX - current.x) >= 1;
+    drag.current = null;
+    setPreview(trimEnd ?? full);
+    if (next !== null && moved) onChange(trimValue(next));
+  }
+  function cancel() {
+    drag.current = null;
+    setPreview(trimEnd ?? full);
+  }
+  function nudge(amount: number) {
+    if (disabled) return;
+    const next = clamp(effective + amount, minimum, full);
+    onChange(trimValue(next));
+  }
+  const removed = Math.max(0, full - effective);
+  return (
+    <div className="audio-trim-lane" ref={lane}>
+      <div className="audio-fade-heading">
+        <div>
+          <strong>Soundtrack end</strong>
+          <small>
+            {trimEnd
+              ? `Trim at ${stampTrim(effective)} · removes ${stampTrim(removed)} of tail`
+              : `Full source · ${stampTrim(full)}`}
+          </small>
+        </div>
+        <div className="audio-fade-actions">
+          {trimEnd ? (
+            <button
+              className="quiet-button"
+              onClick={() => onChange(null)}
+              disabled={disabled}
+            >
+              Restore full song
+            </button>
+          ) : (
+            <button
+              className="secondary-button"
+              onClick={() => {
+                if (position >= minimum && position < full - 0.05)
+                  onChange(trimValue(position));
+              }}
+              disabled={
+                disabled || position < minimum || position >= full - 0.05
+              }
+            >
+              Trim to playhead
+            </button>
+          )}
+        </div>
+      </div>
+      <div
+        className="audio-trim-track"
+        role="slider"
+        tabIndex={disabled ? -1 : 0}
+        aria-label="Soundtrack end trim"
+        aria-valuemin={minimum}
+        aria-valuemax={full}
+        aria-valuenow={Number(effective.toFixed(3))}
+        aria-valuetext={
+          trimEnd ? `Ends at ${stampTrim(effective)}` : "Full source"
+        }
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            event.preventDefault();
+            nudge(
+              (event.key === "ArrowRight" ? 1 : -1) *
+                (event.shiftKey ? 1 : 0.25),
+            );
+          }
+        }}
+      >
+        <div
+          className="audio-trim-tail"
+          style={{
+            left: percent(effective) + "%",
+            width: 100 - percent(effective) + "%",
+          }}
+          aria-hidden="true"
+        />
+        <button
+          className="audio-trim-handle"
+          style={{ left: percent(effective) + "%" }}
+          aria-label="Drag soundtrack end"
+          disabled={disabled}
+          onPointerDown={begin}
+          onPointerMove={move}
+          onPointerUp={finish}
+          onPointerCancel={cancel}
+          onLostPointerCapture={cancel}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+              event.preventDefault();
+              nudge(
+                (event.key === "ArrowRight" ? 1 : -1) *
+                  (event.shiftKey ? 1 : 0.25),
+              );
+            }
+          }}
+        />
+      </div>
+      <div className="audio-fade-scale" aria-hidden="true">
+        <span>Start</span>
+        <span>Source end</span>
+      </div>
+      <p className="video-field-note audio-trim-note">
+        Drag the end handle left to remove a dead tail. Trimming adds a short
+        smooth fade when needed so the exported audio reaches silence cleanly.
+      </p>
+    </div>
+  );
+}
+
+function AudioFadeLane({
+  fade,
+  start,
+  span,
+  duration,
+  disabled,
+  onChange,
+  onFocus,
+}: AudioFadeLaneProps) {
+  const lane = useRef<HTMLDivElement>(null);
+  const drag = useRef<{
+    edge: "start" | "end";
+    x: number;
+    width: number;
+    initial: AudioFade;
+  } | null>(null);
+  const [preview, setPreview] = useState<AudioFade | null>(fade);
+  useEffect(() => {
+    if (!drag.current) setPreview(fade);
+  }, [fade]);
+  const visible = preview ?? fade;
+  const percent = (time: number) =>
+    clamp(((time - start) / span) * 100, 0, 100);
+  const stampFade = (time: number) => stamp(time);
+  function candidate(event: PointerEvent<HTMLElement>) {
+    const current = drag.current;
+    if (!current) return null;
+    const delta =
+      ((event.clientX - current.x) / Math.max(1, current.width)) * span;
+    const minimum = 0.25;
+    let nextStart = current.initial.start;
+    let nextEnd = current.initial.end;
+    if (current.edge === "start")
+      nextStart = clamp(
+        current.initial.start + delta,
+        0,
+        current.initial.end - minimum,
+      );
+    else
+      nextEnd = clamp(
+        current.initial.end + delta,
+        current.initial.start + minimum,
+        duration,
+      );
+    return normalizeAudioFade(
+      { start: nextStart, end: nextEnd, curve: current.initial.curve },
+      duration,
+    );
+  }
+  function begin(event: PointerEvent<HTMLElement>, edge: "start" | "end") {
+    if (!fade || disabled || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = {
+      edge,
+      x: event.clientX,
+      width: lane.current?.clientWidth || 1,
+      initial: fade,
+    };
+    setPreview(fade);
+  }
+  function move(event: PointerEvent<HTMLElement>) {
+    const next = candidate(event);
+    if (next) setPreview(next);
+  }
+  function finish(event: PointerEvent<HTMLElement>) {
+    const current = drag.current;
+    const next = candidate(event);
+    const moved = current && Math.abs(event.clientX - current.x) >= 1;
+    drag.current = null;
+    setPreview(null);
+    if (next && moved) onChange(next);
+  }
+  function cancel() {
+    drag.current = null;
+    setPreview(null);
+  }
+  function nudge(edge: "start" | "end", amount: number) {
+    if (!fade || disabled) return;
+    const minimum = 0.25;
+    const nextStart =
+      edge === "start"
+        ? clamp(fade.start + amount, 0, fade.end - minimum)
+        : fade.start;
+    const nextEnd =
+      edge === "end"
+        ? clamp(fade.end + amount, fade.start + minimum, duration)
+        : fade.end;
+    const next = normalizeAudioFade(
+      { start: nextStart, end: nextEnd, curve: fade.curve },
+      duration,
+    );
+    if (next) onChange(next);
+  }
+  const path = visible
+    ? (() => {
+        const x0 = (percent(visible.start) / 100) * 900;
+        const x1 = (percent(visible.end) / 100) * 900;
+        const bend = Math.max(12, (x1 - x0) * 0.35);
+        return visible.curve === "linear"
+          ? `M0,13 H${x0} L${x1},57 H900`
+          : `M0,13 H${x0} C${x0 + bend},13 ${x1 - bend},57 ${x1},57 H900`;
+      })()
+    : "M0,13 H900";
+  return (
+    <div className="audio-fade-lane" ref={lane}>
+      <div className="audio-fade-heading">
+        <div>
+          <strong>Audio fade-out</strong>
+          <small>
+            {visible
+              ? `Starts ${stampFade(visible.start)} · ends ${stampFade(visible.end)} · ${visible.curve}`
+              : "No fade-out set"}
+          </small>
+        </div>
+        <div className="audio-fade-actions">
+          {fade && (fade.start < start || fade.end > start + span) && (
+            <button
+              className="quiet-button"
+              onClick={onFocus}
+              disabled={disabled}
+            >
+              Show fade
+            </button>
+          )}
+          {fade ? (
+            <button
+              className="quiet-button"
+              onClick={() => onChange(null)}
+              disabled={disabled}
+            >
+              Remove fade
+            </button>
+          ) : (
+            <button
+              className="secondary-button"
+              onClick={() =>
+                onChange(
+                  normalizeAudioFade(
+                    {
+                      start: Math.max(0, duration - 5),
+                      end: duration,
+                      curve: "smooth",
+                    },
+                    duration,
+                  ),
+                )
+              }
+              disabled={disabled || duration < 0.25}
+            >
+              Add fade-out
+            </button>
+          )}
+          <label>
+            Curve
+            <select
+              aria-label="Audio fade curve"
+              value={fade?.curve ?? "smooth"}
+              disabled={disabled || !fade}
+              onChange={(event) =>
+                fade &&
+                onChange({
+                  ...fade,
+                  curve: event.target.value as AudioFade["curve"],
+                })
+              }
+            >
+              <option value="smooth">Smooth</option>
+              <option value="linear">Linear</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div className="audio-fade-track" aria-label="Audio fade envelope">
+        <svg viewBox="0 0 900 72" preserveAspectRatio="none" role="img">
+          <path
+            className="audio-fade-grid"
+            d="M0,13 H900 M0,35 H900 M0,57 H900"
+          />
+          <path className="audio-fade-path" d={path} />
+        </svg>
+        {fade &&
+          (["start", "end"] as const).map((edge) => (
+            <button
+              key={edge}
+              className={`audio-fade-handle ${edge}`}
+              style={{ left: `${percent((preview ?? fade)[edge])}%` }}
+              aria-label={`Drag fade ${edge}`}
+              disabled={disabled}
+              onPointerDown={(event) => begin(event, edge)}
+              onPointerMove={move}
+              onPointerUp={finish}
+              onPointerCancel={cancel}
+              onLostPointerCapture={cancel}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                  event.preventDefault();
+                  nudge(
+                    edge,
+                    (event.key === "ArrowRight" ? 1 : -1) *
+                      (event.shiftKey ? 1 : 0.25),
+                  );
+                }
+              }}
+            />
+          ))}
+      </div>
+      <div className="audio-fade-scale" aria-hidden="true">
+        <span>Full volume</span>
+        <span>Silent</span>
+      </div>
+    </div>
+  );
+}
 
 export function LyricTimelineEditor(props: Props) {
   const [open, setOpen] = useState(false);
@@ -96,6 +510,7 @@ function TimelineBody({
   alignment,
   draft,
   duration,
+  sourceDuration,
   audioUrl,
   audioRef,
   audioActive,
@@ -127,6 +542,9 @@ function TimelineBody({
   const [previewEdits, setPreviewEdits] = useState<
     VideoDraft["wordEdits"] | null
   >(null);
+  const [previewCueEdits, setPreviewCueEdits] = useState<
+    VideoDraft["cueEdits"] | null
+  >(null);
   const lineTrack = useRef<HTMLDivElement>(null);
   const lineList = useRef<HTMLDivElement>(null);
   const tapButton = useRef<HTMLButtonElement>(null);
@@ -139,6 +557,7 @@ function TimelineBody({
     width: number;
     line: Alignment["cues"][number];
     edits: VideoDraft["wordEdits"];
+    cueEdits: VideoDraft["cueEdits"];
     word?: number;
     edge?: "start" | "end";
   };
@@ -169,6 +588,7 @@ function TimelineBody({
     );
     setTaps(null);
     setPreviewEdits(null);
+    setPreviewCueEdits(null);
     drag.current = null;
   }, [draft.lyrics]);
   const span = Math.max(0.1, Math.min(windowSize, duration)),
@@ -269,16 +689,127 @@ function TimelineBody({
       width: lineTrack.current!.clientWidth,
       line: lines[index],
       edits: draft.wordEdits,
+      cueEdits: draft.cueEdits,
       word: wi,
       edge,
     };
   }
+  function cueBounds(
+    source: Alignment["cues"][number],
+    edits: VideoDraft["cueEdits"] = previewCueEdits || draft.cueEdits,
+  ) {
+    const raw = lineBounds(source);
+    if (!raw) return null;
+    const edit = edits[source.id];
+    return edit
+      ? { start: edit.startFrame / FPS, end: edit.endFrame / FPS }
+      : raw;
+  }
+  function lineEdgeEdits(e: PointerEvent<HTMLElement>) {
+    const d = drag.current;
+    if (!d || d.word !== undefined || !d.edge) return null;
+    const delta = ((e.clientX - d.x) / Math.max(1, d.width)) * span;
+    const index = lines.findIndex((item) => item.id === d.line.id);
+    const previous = index > 0 ? cueBounds(lines[index - 1], d.cueEdits) : null;
+    const next =
+      index >= 0 && index + 1 < lines.length
+        ? cueBounds(lines[index + 1], d.cueEdits)
+        : null;
+    return resizeLyricLine(
+      d.line,
+      d.cueEdits,
+      delta,
+      d.edge,
+      duration,
+      previous?.end,
+      next?.start,
+    );
+  }
+  function setLineEdge(edge: "start" | "end", value: number) {
+    if (!line || !Number.isFinite(value)) return;
+    const bounds = cueBounds(line);
+    if (!bounds) return;
+    const index = lines.findIndex((item) => item.id === line.id);
+    const previous = index > 0 ? cueBounds(lines[index - 1]) : null;
+    const next =
+      index >= 0 && index + 1 < lines.length
+        ? cueBounds(lines[index + 1])
+        : null;
+    const target = clamp(value, 0, duration);
+    const current = edge === "start" ? bounds.start : bounds.end;
+    const edits = resizeLyricLine(
+      line,
+      draft.cueEdits,
+      target - current,
+      edge,
+      duration,
+      previous?.end,
+      next?.start,
+    );
+    if (edits !== draft.cueEdits) change({ cueEdits: edits });
+  }
+  function trimLineToNeighbors() {
+    if (!line) return;
+    const bounds = cueBounds(line);
+    if (!bounds) return;
+    const index = lines.findIndex((item) => item.id === line.id);
+    const previous = index > 0 ? cueBounds(lines[index - 1]) : null;
+    const next =
+      index >= 0 && index + 1 < lines.length
+        ? cueBounds(lines[index + 1])
+        : null;
+    let edits = draft.cueEdits;
+    if (previous && bounds.start < previous.end)
+      edits = resizeLyricLine(
+        line,
+        edits,
+        previous.end - bounds.start,
+        "start",
+        duration,
+        previous.end,
+        next?.start,
+      );
+    const afterStart = edits[line.id]
+      ? edits[line.id].startFrame / FPS
+      : bounds.start;
+    const afterEnd = edits[line.id]
+      ? edits[line.id].endFrame / FPS
+      : bounds.end;
+    if (next && afterEnd > next.start)
+      edits = resizeLyricLine(
+        line,
+        edits,
+        next.start - afterEnd,
+        "end",
+        duration,
+        previous?.end,
+        next.start,
+      );
+    if (edits !== draft.cueEdits) {
+      change({ cueEdits: edits });
+      setNotice("Line window trimmed to the neighboring phrases.");
+    }
+  }
+  function changeAudioEnd(audioEnd: number | null) {
+    const end = audioEnd ?? sourceDuration;
+    const nextFade = draft.audioFade
+      ? retimeAudioFade(draft.audioFade, end, end)
+      : audioEnd
+        ? {
+            start: Math.max(0, end - 5),
+            end,
+            curve: "smooth" as const,
+          }
+        : null;
+    change({ audioEnd, audioFade: nextFade });
+  }
   function dragEdits(e: PointerEvent<HTMLElement>) {
     const d = drag.current;
     if (!d) return null;
-    const delta = ((e.clientX - d.x) / d.width) * span;
-    if (d.word === undefined)
+    const delta = ((e.clientX - d.x) / Math.max(1, d.width)) * span;
+    if (d.word === undefined && !d.edge)
       return moveLyricLine(d.line, d.edits, delta, duration);
+    if (d.word === undefined) return d.edits;
     const w = d.line.words[d.word];
     if (w.start === null || w.end === null) return null;
     let a = w.start,
@@ -296,19 +827,28 @@ function TimelineBody({
     };
   }
   function finishDrag(e: PointerEvent<HTMLElement>) {
-    const edits = dragEdits(e);
-    const moved = drag.current && Math.abs(e.clientX - drag.current.x) >= 1;
+    const current = drag.current;
+    const lineEdge = current?.word === undefined && !!current?.edge;
+    const cueEdits = lineEdge ? lineEdgeEdits(e) : null;
+    const edits = lineEdge ? null : dragEdits(e);
+    const moved = current && Math.abs(e.clientX - current.x) >= 1;
     drag.current = null;
     setPreviewEdits(null);
-    if (edits && moved) change({ wordEdits: edits });
+    setPreviewCueEdits(null);
+    if (moved && cueEdits) change({ cueEdits });
+    else if (edits && moved) change({ wordEdits: edits });
   }
   function cancelDrag() {
     drag.current = null;
     setPreviewEdits(null);
+    setPreviewCueEdits(null);
   }
   const dragging = {
     onPointerMove: (e: PointerEvent<HTMLElement>) => {
-      if (drag.current) setPreviewEdits(dragEdits(e));
+      if (!drag.current) return;
+      if (drag.current.word === undefined && drag.current.edge)
+        setPreviewCueEdits(lineEdgeEdits(e));
+      else setPreviewEdits(dragEdits(e));
     },
     onPointerUp: finishDrag,
     onPointerCancel: cancelDrag,
@@ -424,7 +964,7 @@ function TimelineBody({
 
   const rowEnds: number[] = [];
   const blocks = lines
-    .map((l, i) => ({ line: l, i, bounds: lineBounds(l) }))
+    .map((l, i) => ({ line: l, i, bounds: cueBounds(l) }))
     .filter((b) => b.bounds && b.bounds.end >= start && b.bounds.start <= end)
     .sort((a, b) => a.bounds!.start - b.bounds!.start)
     .map((b) => {
@@ -445,8 +985,9 @@ function TimelineBody({
         {tool === "pan"
           ? "Hand tool: drag the waveform or lyric tracks left or right to move through the song. "
           : "Arrow tool: click the waveform to scrub. Drag a lyric block to move the whole line. "}
-        Select a word to move it or drag its edges. Arrow keys nudge a focused
-        block by 0.05s; Shift moves it by 0.5s.
+        Drag a line edge to trim its visible window, or select a word to move it
+        and drag its edges. Neighboring line windows stay separated. Arrow keys
+        nudge a focused block by 0.05s; Shift moves it by 0.5s.
       </p>
       <div className="lyric-timeline-toolbar">
         <div className="lyric-tool-picker" aria-label="Timeline tools">
@@ -571,7 +1112,7 @@ function TimelineBody({
             aria-label="Choose lyric line"
           >
             {lines.map((l, i) => {
-              const bounds = lineBounds(l),
+              const bounds = cueBounds(l),
                 issue = problems[i].find(Boolean);
               return (
                 <div
@@ -610,7 +1151,11 @@ function TimelineBody({
         <div
           className={`lyric-timeline-main ${tool === "pan" ? "lyric-pan-mode" : ""}`}
         >
-          <LyricTimingPreview lines={lines} position={position} />
+          <LyricTimingPreview
+            lines={lines}
+            cueEdits={previewCueEdits || draft.cueEdits}
+            position={position}
+          />
           <div className="lyric-ruler">
             {Array.from({ length: 6 }, (_, i) => (
               <span key={i}>{stamp(start + (span * i) / 5)}</span>
@@ -684,6 +1229,27 @@ function TimelineBody({
               />
             )}
           </div>
+          <AudioTrimLane
+            sourceDuration={sourceDuration}
+            trimEnd={draft.audioEnd}
+            position={position}
+            disabled={!!taps || tool === "pan"}
+            onChange={changeAudioEnd}
+          />
+          <AudioFadeLane
+            fade={draft.audioFade}
+            start={start}
+            span={span}
+            duration={duration}
+            disabled={!!taps || tool === "pan"}
+            onChange={(audioFade) => change({ audioFade })}
+            onFocus={() => {
+              if (draft.audioFade)
+                setWindowStart(
+                  clamp(draft.audioFade.start - span * 0.2, 0, maxStart),
+                );
+            }}
+          />
           <div
             className="lyric-line-track"
             ref={lineTrack}
@@ -692,11 +1258,13 @@ function TimelineBody({
             style={{ height: Math.max(2, rowEnds.length) * 36 + 8 }}
           >
             {blocks.map(({ line: l, i, bounds, row }) => (
-              <button
+              <div
                 key={l.id}
+                role="button"
+                tabIndex={taps ? -1 : 0}
                 aria-label={`Move line ${i + 1}: ${l.text}`}
                 aria-pressed={selected === i}
-                disabled={!!taps}
+                aria-disabled={taps ? "true" : undefined}
                 className={`lyric-block ${selected === i ? "selected" : ""} ${problems[i].some(Boolean) ? "needs-review" : ""}`}
                 style={{
                   ...blockStyle(bounds!.start, bounds!.end),
@@ -726,7 +1294,18 @@ function TimelineBody({
                 <span>
                   {i + 1}. {l.text}
                 </span>
-              </button>
+                {(["start", "end"] as const).map((edge) => (
+                  <button
+                    key={edge}
+                    className={`lyric-line-edge ${edge}`}
+                    tabIndex={-1}
+                    aria-label={`Drag line ${i + 1} ${edge}`}
+                    disabled={!!taps}
+                    onPointerDown={(e) => beginDrag(e, i, undefined, edge)}
+                    {...dragging}
+                  />
+                ))}
+              </div>
             ))}
             {cursorVisible && (
               <div
@@ -819,22 +1398,66 @@ function TimelineBody({
                     className="quiet-button"
                     disabled={
                       !!taps ||
-                      !line.words.some(
-                        (_, i) => draft.wordEdits[`${line.id}:${i}`],
-                      )
+                      (!draft.cueEdits[line.id] &&
+                        !line.words.some(
+                          (_, i) => draft.wordEdits[`${line.id}:${i}`],
+                        ))
                     }
                     onClick={() => {
                       const edits = { ...draft.wordEdits };
+                      const cueEdits = { ...draft.cueEdits };
                       line.words.forEach(
                         (_, i) => delete edits[`${line.id}:${i}`],
                       );
-                      change({ wordEdits: edits });
+                      delete cueEdits[line.id];
+                      change({ wordEdits: edits, cueEdits });
                     }}
                   >
                     Reset line
                   </button>
+                  <button
+                    className="quiet-button"
+                    disabled={!!taps || !cueBounds(line) || lines.length < 2}
+                    onClick={trimLineToNeighbors}
+                  >
+                    Trim to neighbors
+                  </button>
                 </div>
               </div>
+              {cueBounds(line) && (
+                <fieldset className="lyric-line-adjust" disabled={!!taps}>
+                  <legend>
+                    Line window{" "}
+                    <small>Controls when this phrase is visible</small>
+                  </legend>
+                  {(["start", "end"] as const).map((edge) => (
+                    <div key={edge}>
+                      <label>
+                        {edge === "start" ? "Start" : "End"} (seconds)
+                        <input
+                          type="number"
+                          aria-label={"Selected lyric line " + edge}
+                          min={0}
+                          max={duration}
+                          step={1 / FPS}
+                          value={cueBounds(line)?.[edge].toFixed(2) ?? ""}
+                          onChange={(event) => {
+                            const value = Number(event.target.value);
+                            if (Number.isFinite(value))
+                              setLineEdge(edge, value);
+                          }}
+                        />
+                      </label>
+                      <button
+                        className="quiet-button"
+                        onClick={() => setLineEdge(edge, position)}
+                      >
+                        Set {edge} at playhead
+                      </button>
+                    </div>
+                  ))}
+                </fieldset>
+              )}
               <div
                 className="lyric-word-track"
                 aria-label="Selected line word blocks"

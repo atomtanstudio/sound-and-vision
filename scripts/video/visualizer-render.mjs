@@ -6,6 +6,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { visualizerSchedule } from "../../src/video/visualizers/schedule.ts";
+import {
+  ffmpegAudioFadeFilter,
+  normalizeAudioFade,
+} from "../../src/video/audioFade.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const args = Object.fromEntries(
@@ -35,6 +39,22 @@ const duration = Math.min(
   Number(args.duration ?? analysis.duration),
   Number(analysis.duration),
 );
+const audioFade =
+  args["fade-start"] !== undefined || args["fade-end"] !== undefined
+    ? normalizeAudioFade(
+        {
+          start: Number(args["fade-start"]),
+          end: Number(args["fade-end"]),
+          curve: args["fade-curve"],
+        },
+        duration,
+      )
+    : null;
+if (
+  (args["fade-start"] !== undefined || args["fade-end"] !== undefined) &&
+  !audioFade
+)
+  throw Error("Invalid audio fade");
 const count = Math.ceil(duration * fps);
 if (!Array.isArray(analysis.frames) || analysis.frames.length < count)
   throw Error(`Expected at least ${count} audio frames`);
@@ -69,12 +89,12 @@ if (
 )
   throw Error("Invalid preset sequence");
 const interval = Number(args.interval ?? 20),
-  fade = exactSchedule ? 0 : Math.max(0, Number(args.fade ?? 1.3));
+  sceneFade = exactSchedule ? 0 : Math.max(0, Number(args.fade ?? 1.3));
 if (
   !Number.isFinite(interval) ||
   interval < 5 ||
-  !Number.isFinite(fade) ||
-  fade > interval / 2
+  !Number.isFinite(sceneFade) ||
+  sceneFade > interval / 2
 )
   throw Error("Invalid scene interval or crossfade duration");
 if (
@@ -122,8 +142,8 @@ const rows = analysis.frames
     const preset = sequence[scene % sequence.length],
       next = sequence[(scene + 1) % sequence.length];
     const boundary = changes[scene + 1] ?? Infinity;
-    const blend = fade
-      ? Math.max(0, Math.min(1, (time - (boundary - fade)) / fade))
+    const blend = sceneFade
+      ? Math.max(0, Math.min(1, (time - (boundary - sceneFade)) / sceneFade))
       : 0;
     const features = ["bass", "mid", "treble", "onset", "energy"].map((key) => {
       const value = Number(frame[key] ?? 0);
@@ -197,7 +217,7 @@ if (args.audio)
     "-map",
     "1:a:0",
     "-af",
-    `atrim=duration=${duration}`,
+    ffmpegAudioFadeFilter(audioFade, duration),
     "-c:a",
     "aac",
     "-b:a",
@@ -303,7 +323,7 @@ const report = {
   shaderSource: shaderSnapshot,
   analysis: resolve(args.analysis),
   output,
-  fadeSeconds: fade,
+  fadeSeconds: sceneFade,
   beatAligned: !exactSchedule && beats.length > 0,
   equalTime: args.visualizer === "all",
   strength,

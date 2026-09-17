@@ -65,7 +65,7 @@ def test_real_export_preserves_duration_with_cuts_blends_and_repeats(tmp_path, j
 def test_plan_review_render_resume_and_song_ownership(tmp_path, monkeypatch):
     from . import music_video
     original_routes = music_video.routes
-    calls=[]; fail_once=[True]
+    calls=[]; fail_once=[True]; releases=[]; cancel_export=[False]
     def wrapped(service, ops):
         def folder(job_id):
             p=tmp_path/'data/video'/job_id;p.mkdir(parents=True,exist_ok=True);return p
@@ -78,8 +78,10 @@ def test_plan_review_render_resume_and_song_ownership(tmp_path, monkeypatch):
                 (folder(job_id)/'background.mp4').write_bytes(b'fixture')
                 return {'muted':True}
             return service.submit(job_id,'video-motion',payload,job,serialized=False)
-        async def process(command,work,*args,**kwargs): (work/'movie.mp4').write_bytes(b'fixture')
-        return original_routes(service,{'start':start,'folder':folder,'run_process':process})
+        async def process(command,work,*args,**kwargs):
+            if cancel_export[0]:raise asyncio.CancelledError()
+            (work/'movie.mp4').write_bytes(b'fixture')
+        return original_routes(service,{'start':start,'folder':folder,'run_process':process,'release_gpu':releases.append})
     monkeypatch.setattr(music_video,'routes',wrapped)
     config=Settings(tmp_path/'data',tmp_path/'model',tmp_path/'vae','x'*40)
     app=create_app(config,start_worker=False)
@@ -110,9 +112,11 @@ def test_plan_review_render_resume_and_song_ownership(tmp_path, monkeypatch):
         assert c.post(f'/api/takes/{other}/music-video/render',json=render).status_code==404
         assert c.post(f'/api/takes/{t}/music-video/render',json=render).status_code==202
         result=wait(render['requestId']);assert result['state']=='failed'
+        assert releases == ['music-video:render-test-001']
         assert [p['slot'] for p in calls]==[0,1]
         retry=c.post(f'/api/takes/{t}/music-video/render',json={**render,'requestId':'render-test-002'});assert retry.status_code==202
         result=wait('render-test-002');assert result['state']=='succeeded',result
+        assert releases[-1] == 'music-video:render-test-002'
         assert [p['slot'] for p in calls]==[0,1,1,2] # Finished first clip reused.
         assert calls[1]['continuationJobId']==calls[2]['continuationJobId']
         from .h3_prompts import FIRST_FRAME_INSTRUCTION
@@ -165,6 +169,10 @@ def test_plan_review_render_resume_and_song_ownership(tmp_path, monkeypatch):
             result = wait(request_id); assert result['state'] == 'succeeded', result
         assert len(calls) == before + 2
         assert all(p['kind'] == 'alignment' for p in calls[before:])
+        cancel_export[0] = True
+        assert c.post(f'/api/takes/{t}/music-video/render', json={**render, 'requestId': 'cancelled-render-001'}).status_code == 202
+        assert wait('cancelled-render-001')['state'] == 'cancelled'
+        assert releases[-1] == 'music-video:cancelled-render-001'
 
 
 

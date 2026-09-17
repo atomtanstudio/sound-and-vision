@@ -1,3 +1,4 @@
+import type { LoraSelection, SavedLora } from "./TrainedStyles";
 export type Page = "home" | "music" | "video" | "library";
 export function pageFromPath(path: string): Page {
   return path === "/home"
@@ -35,6 +36,7 @@ export type SongForm = {
   genre?: string;
   referenceId?: string;
   sourceTakeId?: string;
+  lora?: LoraSelection | null;
   writingTask: string;
   writingPrompt: string;
 };
@@ -61,12 +63,14 @@ export type Track = {
   attempt?: number;
   error?: string | null;
   warnings?: string[];
+  truncated?: { abc?: boolean; semantic?: boolean } | null;
   sampleRate?: number | null;
   delivery?: Record<string, unknown> | null;
   favorite: boolean;
   created: number;
   deletedAt?: number | null;
   form?: SongForm;
+  lora?: SavedLora | null;
   requestId?: string;
   take?: number;
   coverStatus?: "reference" | "requested" | "unavailable" | "ready";
@@ -83,6 +87,7 @@ export const initialForm: SongForm = {
   seed: "",
   cfg_scale: "",
   planFirst: false,
+  lora: null,
   ode_steps: 32,
   semantic: {
     temperature: 1,
@@ -179,6 +184,13 @@ export function writeLocal(key: string, value: unknown) {
   }
 }
 export function validate(form: SongForm): string | null {
+  if (
+    form.lora &&
+    (!Number.isFinite(form.lora.strength) ||
+      form.lora.strength < 0.1 ||
+      form.lora.strength > 2)
+  )
+    return "LoRA strength must be between 0.1 and 2.";
   if (!form.description.trim() && !form.style.trim())
     return "Add a song description or style first.";
   if (form.seed && (!/^\d+$/.test(form.seed) || BigInt(form.seed) >= 2n ** 63n))
@@ -230,6 +242,7 @@ export function generationRequest(form: SongForm, requestId: string) {
     genre: form.genre || null,
     referenceId: form.referenceId || null,
     sourceTakeId: form.sourceTakeId || null,
+    lora: form.lora || null,
     title: form.title,
     status: "draft",
     description: form.description,

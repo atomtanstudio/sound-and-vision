@@ -1,21 +1,27 @@
 import type { Alignment } from "./production";
+import { FPS, type VideoDraft } from "./timeline";
 
 export function LyricTimingPreview({
   lines,
+  cueEdits,
   position,
 }: {
   lines: Alignment["cues"];
+  cueEdits?: VideoDraft["cueEdits"];
   position: number;
 }) {
   const active = lines.filter((line) => {
     const words = line.words.filter(
       (w) => w.start !== null && w.end !== null && w.end > w.start,
     );
-    return (
-      words.length &&
-      position >= Math.min(...words.map((w) => w.start!)) &&
-      position < Math.max(...words.map((w) => w.end!))
-    );
+    const edit = cueEdits?.[line.id];
+    const lineStart = edit
+      ? edit.startFrame / FPS
+      : Math.min(...words.map((w) => w.start!));
+    const lineEnd = edit
+      ? edit.endFrame / FPS
+      : Math.max(...words.map((w) => w.end!));
+    return words.length && position >= lineStart && position < lineEnd;
   });
   return (
     <section className="lyric-live-preview" aria-label="Live lyric preview">

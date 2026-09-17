@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   lineBounds,
   moveLyricLine,
+  resizeLyricLine,
   tappedLyricLine,
   waveformPeaks,
   lyricProblems,
@@ -51,6 +52,20 @@ test("whole-line clamping stops at the song edges without compressing word spaci
     moveLyricLine({ ...line, words: [line.words[2]] }, {}, 3, 10),
     {},
   );
+});
+test("line cue trims stop at neighboring phrases and keep measured word timing", () => {
+  const edits = resizeLyricLine(line, {}, 100, "end", 10, undefined, 3);
+  assert.equal(edits["line-0"].endFrame, 72);
+  assert.equal(edits["line-0"].startFrame, 24);
+  const draft = {
+    ...makeDraft({ id: "trim", title: "Trim", form: { lyrics: line.text } }),
+    cueEdits: edits,
+  };
+  const cues = alignedCues({ lyrics: line.text, cues: [line] }, draft);
+  assert.equal(cues[0].endFrame, 72);
+  assert.equal(cues[0].words[0].start, 1);
+  assert.equal(cues[0].words[1].end, 2.5);
+  assert.deepEqual(resizeLyricLine(line, {}, -100, "start", 10, 3), {});
 });
 test("a partially timed word stays incomplete after a line move", () => {
   const partial = { ...line, words: [{ text: "Stay", start: null, end: 2 }] };

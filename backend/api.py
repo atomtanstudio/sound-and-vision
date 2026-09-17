@@ -6,7 +6,10 @@ from pathlib import Path
 from urllib.request import urlopen
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
-from .contracts import ContinuePlan, GenerationSubmission, TrackPatch
+from .contracts import ContinuePlan, GenerationSubmission, SongForm, TrackPatch
+from .loras import LoraLibrary, triggered_style
+from .gpu_cleanup import VideoGpuCleanup
+from .lora_runtime import resolve_lora_runtime
 from .assistance import Assistance, routes as assistance_routes
 from .references import routes as reference_routes
 from .covers import routes as cover_routes, start_cover
@@ -57,6 +60,12 @@ class Settings:
     source_revision: str = "92a73cc7652fcc1f937855e4b765e0a0edd7ff2e"
     comfy_urls: tuple[str, ...] = ()
     min_free_mib: int = 23552
+    loras: Path | None = None
+    video_comfy_urls: tuple[str, ...] = ()
+    lora_engine: str = "native"
+    lora_toolkit_root: Path | None = None
+    lora_toolkit_python: Path | None = None
+    lora_toolkit_model: Path | None = None
 
     @classmethod
     def from_env(cls):
@@ -76,6 +85,14 @@ class Settings:
                 if u
             ),
             min_free_mib=int(os.environ.get("SOUND_VISION_MIN_FREE_MIB", "23552")),
+            loras=Path(os.environ.get("SOUND_VISION_LORAS", str(ROOT / "loras"))).resolve(),
+            video_comfy_urls=tuple(
+                u.strip().rstrip("/") for u in os.environ.get("SOUND_VISION_VIDEO_COMFY_URLS", "").split(",") if u.strip()
+            ),
+            lora_engine=os.environ.get("SOUND_VISION_LORA_ENGINE", "native"),
+            lora_toolkit_root=Path(os.environ["SOUND_VISION_LORA_TOOLKIT_ROOT"]) if os.environ.get("SOUND_VISION_LORA_TOOLKIT_ROOT") else None,
+            lora_toolkit_python=Path(os.environ["SOUND_VISION_LORA_TOOLKIT_PYTHON"]) if os.environ.get("SOUND_VISION_LORA_TOOLKIT_PYTHON") else None,
+            lora_toolkit_model=Path(os.environ["SOUND_VISION_LORA_TOOLKIT_MODEL"]) if os.environ.get("SOUND_VISION_LORA_TOOLKIT_MODEL") else None,
         )
 
 
@@ -122,9 +139,9 @@ class Store:
         with self.db() as db:
             rows = db.execute(
                 """SELECT t.*, p.name AS project_name, r.request_json, j.id AS job_id, j.state AS job_state,
-                j.stage,j.attempt,j.cancel_requested,j.progress_json,j.error,j.output_key FROM takes t
+                j.stage,j.attempt,j.cancel_requested,j.progress_json,j.error,j.output_key,lr.selection_json AS lora_json FROM takes t
                 JOIN projects p ON p.id=t.project_id JOIN generation_requests r ON r.id=t.request_id
-                JOIN generation_jobs j ON j.take_id=t.id WHERE (? OR t.deleted_at IS NULL)
+                JOIN generation_jobs j ON j.take_id=t.id LEFT JOIN generation_loras lr ON lr.request_id=r.id WHERE (? OR t.deleted_at IS NULL)
                 ORDER BY t.created_at DESC,t.take_index""",
                 (include_deleted,),
             ).fetchall()
@@ -160,6 +177,7 @@ class Store:
             "created": row["created_at"],
             "deletedAt": row["deleted_at"],
             "form": json.loads(row["request_json"]),
+            "lora": json.loads(row.get("lora_json") or "null"),
             "requestId": row["request_id"],
             "take": row["take_index"],
             "seed": row["seed"],
@@ -197,8 +215,9 @@ class Store:
     def job(self, take_id):
         with self.db() as db:
             row = db.execute(
-                """SELECT j.*,t.seed,t.take_index,t.request_id,t.deleted_at,r.request_json FROM generation_jobs j
-                JOIN takes t ON t.id=j.take_id JOIN generation_requests r ON r.id=t.request_id WHERE j.take_id=?""",
+                """SELECT j.*,t.seed,t.take_index,t.request_id,t.deleted_at,r.request_json,lr.selection_json AS lora_json FROM generation_jobs j
+                JOIN takes t ON t.id=j.take_id JOIN generation_requests r ON r.id=t.request_id
+                LEFT JOIN generation_loras lr ON lr.request_id=r.id WHERE j.take_id=?""",
                 (take_id,),
             ).fetchone()
         if not row:
@@ -282,11 +301,19 @@ class Manager:
     def __init__(self, settings, store):
         self.settings = settings
         self.store = store
+        self.loras = LoraLibrary(settings.loras or settings.data.parent / "loras")
         self.stop = threading.Event()
         self.thread = None
         self.process = None
         self.server_lock = None
         self.gpu_lock = threading.Lock()
+        self.video_cleanup = VideoGpuCleanup(
+            store.root, settings.video_comfy_urls,
+            os.environ.get("SOUND_VISION_H3_URL", "http://127.0.0.1:7310"),
+        )
+
+    def request_video_cleanup(self, source):
+        self.video_cleanup.request(source)
 
     def start(self):
         self.server_lock = open(self.store.root / "service.lock", "a")
@@ -373,6 +400,7 @@ class Manager:
     def loop(self):
         while not self.stop.wait(2):
             try:
+                self.video_cleanup.run_if_idle(self.gpu_lock)
                 with self.store.db() as db:
                     row = db.execute(
                         "SELECT take_id FROM generation_jobs WHERE state IN ('queued','waiting-for-resource') AND take_id IN (SELECT id FROM takes WHERE deleted_at IS NULL) ORDER BY created_at LIMIT 1"
@@ -464,6 +492,11 @@ class Manager:
             song["abc"] = form["abc"]
         if form["cfg_scale"]:
             song["cfg_scale"] = float(form["cfg_scale"])
+        lora = json.loads(job.get("lora_json") or "null")
+        lora_path = self.loras.path_for(lora) if lora else None
+        engine = resolve_lora_runtime(self.settings, lora, form["cfg_scale"])
+        if lora:
+            song["style"] = triggered_style(song["style"], lora["trigger"])
         spec = {
             "song": song,
             "generation": {
@@ -477,6 +510,9 @@ class Manager:
             "model_revision": self.settings.model_revision,
             "vae_revision": self.settings.vae_revision,
             "output": str(out),
+            "lora": lora,
+            "lora_path": lora_path,
+            "engine": engine,
             "plan_first": form["planFirst"]
             and form["cot"] != "off"
             and not job["resume_plan_key"],
@@ -493,7 +529,7 @@ class Manager:
         monitor = 0
         with open(out / "worker.log", "w") as output:
             self.process = subprocess.Popen(
-                [sys.executable, "-m", "backend.runner", str(out / "spec.json")],
+                [engine["python"] if engine else sys.executable, "-m", "backend.runner", str(out / "spec.json")],
                 cwd=ROOT,
                 stdout=output,
                 stderr=subprocess.STDOUT,
@@ -692,12 +728,18 @@ def create_app(settings=None, start_worker=True):
             "weight_license": "CC-BY-NC-4.0",
             "queue": "persistent-single-worker",
             "database": "sqlite",
-            "gpu_policy": "Observe external queues; never unload or interrupt other services.",
+            "gpu_policy": "Observe external queues; release opted-in idle video caches; never interrupt other work.",
+            "video_cache_cleanup": bool(settings.video_comfy_urls),
+            "lora_engine": settings.lora_engine,
         }
 
     @app.get("/api/library")
     def library(include_deleted: bool = False):
         return {"tracks": store.rows(include_deleted=include_deleted)}
+
+    @app.get("/api/loras")
+    def loras():
+        return manager.loras.scan()
 
     @app.post("/api/generations", status_code=202)
     async def submit(payload: GenerationSubmission):
@@ -718,7 +760,7 @@ def create_app(settings=None, start_worker=True):
             ).fetchone()
             if existing:
                 db.rollback()
-                if existing["request_json"] != canonical:
+                if SongForm.model_validate_json(existing["request_json"]).model_dump() != form:
                     raise HTTPException(
                         409, "This request ID already belongs to different inputs."
                     )
@@ -727,6 +769,12 @@ def create_app(settings=None, start_worker=True):
                     "tracks": [t for t in store.rows() if t["requestId"] == request_id],
                     "reused": True,
                 }
+            try:
+                lora = manager.loras.resolve(form["lora"]) if form.get("lora") else None
+                resolve_lora_runtime(settings, lora, form["cfg_scale"])
+            except ValueError as exc:
+                db.rollback()
+                raise HTTPException(422, str(exc)) from exc
             project_id = hashlib.sha256(form["project"].encode()).hexdigest()[:32]
             db.execute(
                 "INSERT OR IGNORE INTO projects VALUES(?,?,?,?)",
@@ -745,6 +793,8 @@ def create_app(settings=None, start_worker=True):
                     stamp,
                 ),
             )
+            if lora:
+                db.execute("INSERT INTO generation_loras VALUES(?,?)", (request_id, json.dumps(lora)))
             for index in range(1, form["count"] + 1):
                 take = uuid.uuid4().hex
                 seed = (

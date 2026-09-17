@@ -14,6 +14,7 @@ import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
+import { ffmpegAudioFadeFilter } from "../../src/video/audioFade.ts";
 const [work, origin, id] = process.argv.slice(2);
 if (
   !work ||
@@ -124,6 +125,16 @@ try {
         String(config.draft.shade),
         "--progress",
         join(work, "progress.json"),
+        ...(config.draft.audioFade
+          ? [
+              "--fade-start",
+              String(config.draft.audioFade.start),
+              "--fade-end",
+              String(config.draft.audioFade.end),
+              "--fade-curve",
+              config.draft.audioFade.curve,
+            ]
+          : []),
       ],
       { stdio: ["ignore", "inherit", "inherit"] },
     );
@@ -141,11 +152,7 @@ try {
       args:
         process.platform === "darwin"
           ? ["--use-gl=angle", "--use-angle=metal"]
-          : [
-              "--enable-gpu",
-              "--use-angle=vulkan",
-              "--use-gl=angle",
-            ],
+          : ["--enable-gpu", "--use-angle=vulkan", "--use-gl=angle"],
     });
     const analysis = JSON.parse(
       readFileSync(join(work, "analysis.json"), "utf8"),
@@ -235,7 +242,7 @@ try {
         "-b:a",
         "256k",
         "-af",
-        `atrim=duration=${config.duration}`,
+        ffmpegAudioFadeFilter(config.draft.audioFade, config.duration),
         "-frames:v",
         String(totalFrames),
         "-movflags",

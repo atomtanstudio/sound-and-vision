@@ -1,5 +1,10 @@
 import type { Alignment } from "./production";
-import { lyricLines, lyricRenderCues, type VideoDraft } from "./timeline.ts";
+import {
+  FPS,
+  lyricLines,
+  lyricRenderCues,
+  type VideoDraft,
+} from "./timeline.ts";
 
 type Line = Alignment["cues"][number];
 type Edits = VideoDraft["wordEdits"];
@@ -300,6 +305,44 @@ export function moveLyricLine(
     };
   });
   return next;
+}
+
+/** Resize a phrase's visible cue window without changing its word timing. */
+export function resizeLyricLine(
+  line: Line,
+  cueEdits: VideoDraft["cueEdits"],
+  delta: number,
+  edge: "start" | "end",
+  duration: number,
+  previousEnd?: number,
+  nextStart?: number,
+) {
+  const measured = lineBounds(line);
+  if (!measured || !Number.isFinite(delta) || !Number.isFinite(duration))
+    return cueEdits;
+  const existing = cueEdits[line.id];
+  let start = existing ? existing.startFrame / FPS : measured.start;
+  let end = existing ? existing.endFrame / FPS : measured.end;
+  const min = 1 / FPS;
+  if (edge === "start") {
+    const lower = Math.max(0, previousEnd ?? 0);
+    const upper = end - min;
+    if (upper < lower) return cueEdits;
+    start = Math.max(lower, Math.min(upper, start + delta));
+  } else {
+    const lower = start + min;
+    const upper = Math.min(duration, nextStart ?? duration);
+    if (upper < lower) return cueEdits;
+    end = Math.max(lower, Math.min(upper, end + delta));
+  }
+  if (end - start < min) return cueEdits;
+  return {
+    ...cueEdits,
+    [line.id]: {
+      startFrame: Math.max(0, Math.round(start * FPS)),
+      endFrame: Math.min(Math.ceil(duration * FPS), Math.round(end * FPS)),
+    },
+  };
 }
 
 /** A user's taps replace one line only. The last tap marks the line's end. */

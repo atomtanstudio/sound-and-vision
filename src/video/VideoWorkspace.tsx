@@ -68,6 +68,12 @@ import {
   originalVisualizerPresets,
   visualizerPreviewUrl,
 } from "./visualizers/library";
+import {
+  audioFadeGain,
+  normalizeAudioEnd,
+  normalizeAudioFade,
+  retimeAudioFade,
+} from "./audioFade";
 import "@fontsource-variable/newsreader/wght-italic.css";
 
 type AssetPreview = Omit<ImportedAsset, "blob"> & {
@@ -83,6 +89,7 @@ type Props = {
   currentId: string;
   playing: boolean;
   progress: number;
+  volume: number;
   audioRef: RefObject<HTMLAudioElement | null>;
   play: (track: Track) => void;
   seek: (track: Track, seconds: number) => void;
@@ -292,6 +299,12 @@ function restoreDraft(track: Track): VideoDraft {
     draft.prompts && typeof draft.prompts === "object" ? draft.prompts : {};
   draft.cueEdits =
     draft.cueEdits && typeof draft.cueEdits === "object" ? draft.cueEdits : {};
+  const sourceDuration = length(track);
+  draft.audioEnd = normalizeAudioEnd(draft.audioEnd, sourceDuration);
+  draft.audioFade = retimeAudioFade(
+    draft.audioFade,
+    draft.audioEnd ?? sourceDuration,
+  );
   draft.wordEdits =
     draft.wordEdits && typeof draft.wordEdits === "object"
       ? draft.wordEdits
@@ -317,6 +330,7 @@ function VideoEditor({
   currentId,
   playing,
   progress,
+  volume,
   audioRef,
   play,
   seek,
@@ -355,13 +369,16 @@ function VideoEditor({
   const [selectedAsset, setSelectedAsset] = useState(0),
     [showGuides, setShowGuides] = useState(false);
   const [clock, setClock] = useState(currentId === track.id ? progress : 0);
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
   const [measuredDuration, setMeasuredDuration] = useState<number | null>(null);
   const [reduceMotion, setReduceMotion] = useState(
     () => matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const input = useRef<HTMLInputElement>(null),
     replaceSlot = useRef<number | null>(null);
-  const duration = measuredDuration || length(track);
+  const sourceDuration = measuredDuration || length(track);
+  const duration = Math.min(sourceDuration, draft.audioEnd ?? sourceDuration);
   const active = currentId === track.id;
   const previewPlaying = active && playing;
   const visualizerPreset = presetNumber(draft.visualizer);
@@ -524,6 +541,38 @@ function VideoEditor({
   }, [active, playing, progress, audioRef]);
   useEffect(() => {
     const audio = audioRef.current;
+    if (!audio) return;
+    const base = Math.max(0, Math.min(1, volume));
+    audio.volume = active
+      ? base * audioFadeGain(draft.audioFade, position)
+      : base;
+  }, [active, audioRef, volume, draft.audioFade, position]);
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current;
+      if (audio) audio.volume = Math.max(0, Math.min(1, volumeRef.current));
+    };
+  }, [audioRef]);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !active) return;
+    const stopAtTrim = () => {
+      if (!Number.isFinite(audio.currentTime) || audio.currentTime < duration)
+        return;
+      if (audio.currentTime > duration + 0.001) audio.currentTime = duration;
+      setClock(duration);
+      if (!audio.paused) audio.pause();
+    };
+    stopAtTrim();
+    audio.addEventListener("timeupdate", stopAtTrim);
+    audio.addEventListener("seeking", stopAtTrim);
+    return () => {
+      audio.removeEventListener("timeupdate", stopAtTrim);
+      audio.removeEventListener("seeking", stopAtTrim);
+    };
+  }, [active, audioRef, duration]);
+  useEffect(() => {
+    const audio = audioRef.current;
     if (!audio || !active) return;
     const update = () => {
       if (Number.isFinite(audio.duration) && audio.duration > 0)
@@ -592,6 +641,7 @@ function VideoEditor({
       alignment={alignment}
       draft={draft}
       duration={duration}
+      sourceDuration={sourceDuration}
       audioRef={audioRef}
       audioActive={active}
       vocalPreviewEndpoint={
@@ -793,10 +843,12 @@ function VideoEditor({
         </fieldset>
         <MusicVideoCreator
           track={track}
+          duration={duration}
           lyrics={draft.lyrics}
           language={draft.language}
           aspect={draft.aspect}
           cues={lyricRenderCues(alignment, draft)}
+          audioFade={draft.audioFade}
           onAspect={(aspect) => change({ aspect })}
           lyricControls={
             <LyricPreparation

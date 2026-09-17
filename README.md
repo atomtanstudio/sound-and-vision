@@ -55,6 +55,10 @@ Start with the [self-hosted installation guide](SELF_HOSTED.md), then [AI setup]
 
 Follow the [step-by-step setup guide](SELF_HOSTED.md). It covers prerequisites, backend installation, the private local connection, optional AI providers, and your first song. Start there before running `npm run dev`; installing the frontend alone does not install the music backend. A second computer and SSH are optional.
 
+## Trained styles and artists
+
+Train compatible YuE2 LoRAs externally, then copy them into the backend computer's `loras/` folder. The creation page scans it on reload and offers grouped styles, artists and checkpoints, with a strength control and automatic trigger words. Each generated song keeps its checkpoint label for comparison. See [folder layout and supported adapters](loras/README.md).
+
 ## Library
 
 Use **Library** in the sidebar to find saved songs and completed videos together. Filter by Music or Videos, search by title, play videos inline, download exports, or reopen a song in the video editor. The Music page retains its generation queue and detailed song controls.

@@ -35,6 +35,31 @@ python3 /srv/ai/sound-vision/deploy/api_request.py /api/health --root /srv/ai/so
 
 The API configuration and token are `/srv/ai/sound-vision/service.env` and `service.token`, mode 0600; the root/data are owner-only. The API binds only to Legion loopback 5191.
 
+### Release video GPU memory
+
+Set `SOUND_VISION_VIDEO_COMFY_URLS` to the comma-separated video renderer URLs
+the app is allowed to unload after its video jobs. The installer accepts
+`--video-comfy-urls`. The separate `SOUND_VISION_COMFY_URLS` list observes queues;
+observing a service does not authorize automatic unloading. On this Legion
+installation the opted-in H3 Fused Turbo renderer is
+`http://192.168.1.100:8194`; unrelated training and upscaling services are excluded.
+
+Completion, failure and cancellation enqueue a durable cleanup request. The
+music queue manager processes it while the local GPU lock is free, verifies H3
+has no active job, then verifies and rechecks each renderer's queue. It uses
+`POST /free` with `unload_models` and `free_memory` enabled. Busy or unavailable
+renderers are retried after 15 seconds; no job is interrupted or service stopped.
+Models stay warm between clips belonging to an active full-video render. The
+last queued scene repair also schedules cleanup. A stopped provider job may
+continue remotely; cleanup waits until that work actually finishes.
+
+`data/gpu-cleanup/video-pending.json` records pending requests, and
+`video-last-release.json` records the last attempt and observed free VRAM.
+`release_requested` means ComfyUI acknowledged its asynchronous unload request;
+the driver may release memory afterward. Existing GPU admission checks still
+run before the next song starts. Cleanup errors never replace a successful
+video with a failed result, and pending requests are retried after restart.
+
 ### Storyboard image generation
 
 Music-video creation, scene rendering and recovery below are internal development features, disabled in this release. See [AI setup](LOCAL_PROVIDERS.md) for the release gate and supported local providers.
@@ -48,6 +73,47 @@ Each illustrated frame has **Re-render frame**. Its dialog loads the exact saved
 Each existing scene video has **Re-render video**. This submits one fresh take from the current storyboard and song excerpt through `POST /api/films/{id}/scenes/{index}/rerender`, using `{requestId, revision}`. Progress appears beside the video. When ready, the new take appears for review; earlier takes remain in the **Video take** selector. **Use this take** selects the displayed video for the film. Re-rendering alone does not change the selected take or existing exports.
 
 ## App connection
+
+### Matched YuE2 LoRA inference
+
+An optional existing AI Toolkit runtime can handle LoRA-selected songs while the
+API and ordinary songs keep their isolated native runtime. This matches the
+ConvRot8 base and unmerged FP32 LoRA application used for training previews.
+It uses the same persistent queue, GPU admission, cancellation, score review,
+artifact validation and post-job process cleanup. It never launches training,
+downloads model weights, or installs packages.
+
+For an existing installation, add these entries to its private `service.env` and
+restart only Sound & Vision when idle:
+
+```ini
+SOUND_VISION_LORA_ENGINE=ai-toolkit
+SOUND_VISION_LORA_TOOLKIT_ROOT=/path/to/ai-toolkit
+SOUND_VISION_LORA_TOOLKIT_PYTHON=/path/to/ai-toolkit/.venv/bin/python
+SOUND_VISION_LORA_TOOLKIT_MODEL=/path/to/yue2_3b_int8_convrot.safetensors
+```
+
+Keep the interpreter's virtual-environment path; do not resolve its symlink to
+the system Python. The native app runtime still supplies its pinned plan/export
+classes. For new installations, `install_service.py` accepts the corresponding
+three `--lora-toolkit-root`, `--lora-toolkit-python`, and `--lora-toolkit-model`
+options together. Without them, native inference remains the default.
+
+Validated original-engine baseline: AI Toolkit revision
+`d673cc520568baec23e9d24da9b7d27ad76784ba`, PyTorch `2.13.0+cu130`, the cached
+Comfy-Org YuE2 ConvRot8 checkpoint, and FP32 unmerged LoRAs at strength 1. The
+checkpoint digest, actual source revision, source-file hashes and Torch version
+are recorded in each take. Changing that runtime requires a fresh generation
+check; the app does not update it automatically. Guidance currently supports 1
+only, including when left blank. Unsupported guidance or unavailable runtime
+files reject new LoRA submissions rather than falling back silently.
+
+Base-model songs retain the existing BF16 runtime and guidance options. The
+six-minute default generation budget is unchanged; either engine can stop
+earlier through its end-of-song token. Successful test seeds do not guarantee
+every future generation will end before its budget.
+
+### Browser connection
 
 Copy `.env.example` to `.env.local` on the development machine. Put a securely transferred service-token copy in `.secrets/service.token`, mode 0600, and set its path in `SOUND_VISION_TOKEN_FILE`. Set `SOUND_VISION_SSH_HOST` to an already configured SSH host/user. The current deployment uses the `legion` alias and `.secrets/legion-service.token`; these private files are ignored by source control.
 

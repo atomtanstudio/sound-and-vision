@@ -52,6 +52,17 @@ def routes(service, manager):
     h3_url = os.environ.get("SOUND_VISION_H3_URL", "http://127.0.0.1:7310").rstrip("/")
     align_limit, motion_limit = asyncio.Semaphore(1), asyncio.Semaphore(1)
 
+    def release_video_gpu(source, standalone=False):
+        if standalone:
+            with service.store.db() as db:
+                batch = db.execute(
+                    "SELECT 1 FROM assistance_jobs WHERE kind='song-video-render' "
+                    "AND state IN ('queued','running','waiting-for-resource') LIMIT 1"
+                ).fetchone()
+            if batch:
+                return  # Keep the video model warm between clips in a full film.
+        manager.request_video_cleanup(source)
+
     def entries(take_id):
         with service.store.db() as db:
             rows = db.execute(
@@ -427,6 +438,7 @@ def routes(service, manager):
             finally:
                 # Never send ComfyUI's global /interrupt. An in-flight provider job is recoverable.
                 if acquired:
+                    release_video_gpu("clip:" + job_id, standalone=True)
                     manager.gpu_lock.release()
 
     def start(job_id, payload, resume=None):
@@ -609,5 +621,5 @@ def routes(service, manager):
         )
 
     from .music_video import routes as music_video_routes
-    router.include_router(music_video_routes(service, {"start": start, "folder": folder, "entries": entries, "run_process": run_process}))
+    router.include_router(music_video_routes(service, {"start": start, "folder": folder, "entries": entries, "run_process": run_process, "release_gpu": release_video_gpu}))
     return router
