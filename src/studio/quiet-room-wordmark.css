@@ -1,0 +1,36 @@
+@import "./quiet-room-base.css";
+
+/* Current Sound/Vision identity restored for the isolated mock-up. */
+.wordmark {
+  gap: 0;
+  align-items: baseline;
+  font-family: "Manrope Variable", "Manrope", var(--font-ui);
+  font-size: 24px;
+  letter-spacing: -1.3px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.wordmark-sound {
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: lowercase;
+}
+
+.wordmark-sound::after {
+  content: "/";
+  color: var(--iris);
+  font-weight: 400;
+  margin-left: 2px;
+  margin-right: 1px;
+}
+
+.wordmark-vision {
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  color: var(--ink);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}

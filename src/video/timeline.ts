@@ -70,8 +70,13 @@ export type VideoDraft = {
     | "4"
     | "5"
     | "6"
-    | "7";
+    | "7"
+    | "8";
   visualizerStrength: number;
+  reactiveMode?: "song" | "classic";
+  reactiveArtworkId?: string;
+  reactiveGenre?: string;
+  reactiveNotes?: string;
   treatment: "concept" | "narrative" | "performance" | "mixed";
   direction: string;
   prompts: Record<string, string>;
@@ -113,7 +118,7 @@ export function makeDraft(track: Track): VideoDraft {
     pan: true,
     transition: "dissolve",
     showLyrics: true,
-    visualizer: "0",
+    visualizer: "8",
     visualizerStrength: 1,
     treatment: "concept",
     direction: "",

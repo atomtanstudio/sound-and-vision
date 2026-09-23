@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Film, X } from "lucide-react";
+import { createRequestId } from "../../music-studio/api";
 import type { Track } from "../../music-studio/model";
 import { timingIssues, type VideoDraft, type LyricCue } from "../timeline";
 import { originalVisualizerPresets } from "./library";
@@ -118,7 +119,7 @@ export function VisualizerExports({
     };
     const signature = JSON.stringify(body);
     if (pending.current?.signature !== signature)
-      pending.current = { signature, id: crypto.randomUUID() };
+      pending.current = { signature, id: createRequestId() };
     try {
       const job = await api<ExportJob>("", {
         ...body,
@@ -143,7 +144,7 @@ export function VisualizerExports({
   return (
     <section
       className="visualizer-exports"
-      aria-label="Visualizer video exports"
+      aria-label="Song Reactive Visualizer exports"
     >
       <div className="visualizer-export-heading">
         <div>

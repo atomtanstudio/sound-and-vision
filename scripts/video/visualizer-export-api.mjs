@@ -17,6 +17,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { visualizerSchedule } from "../../src/video/visualizers/schedule.ts";
 import { normalizeAudioFade } from "../../src/video/audioFade.ts";
+import { validateScene } from "../../src/video/visualizers/scene.ts";
 
 const ACTIVE = new Set(["queued", "running"]);
 const takePattern = /^[a-f0-9]{32}$/;
@@ -45,6 +46,17 @@ export function validateExport(body) {
   const input = body.draft || {},
     draft = {};
   draft.aspect = enumValue(input.aspect, ["16:9", "9:16"], "aspect ratio");
+  if (input.reactiveMode !== undefined)
+    draft.reactiveMode = enumValue(
+      input.reactiveMode,
+      ["song", "classic"],
+      "visualizer mode",
+    );
+  if (draft.reactiveMode === "song") {
+    if (!idPattern.test(input.reactiveArtworkId || ""))
+      throw Error("Create this song’s artwork before rendering.");
+    draft.reactiveArtworkId = input.reactiveArtworkId;
+  }
   draft.visualizer = enumValue(
     input.visualizer,
     [
@@ -60,9 +72,11 @@ export function validateExport(body) {
       "5",
       "6",
       "7",
+      "8",
     ],
     "visualizer",
   );
+  if (draft.reactiveMode === "song") draft.visualizer = "8";
   draft.visualizerStrength = number(
     input.visualizerStrength,
     0.25,
@@ -92,6 +106,10 @@ export function validateExport(body) {
     draft[field] = input[field];
   }
   const duration = number(body.duration, 1, 3600, "song duration");
+  if (body.preview !== undefined && typeof body.preview !== "boolean")
+    throw Error("Invalid preview option");
+  if (body.preview && draft.reactiveMode !== "song")
+    throw Error("Motion previews require song artwork.");
   const audioFade = normalizeAudioFade(input.audioFade, duration);
   if (input.audioFade != null && !audioFade) throw Error("Invalid audio fade");
   draft.audioFade = audioFade;
@@ -157,17 +175,24 @@ export function validateExport(body) {
     requestId: body.requestId,
     takeId: body.takeId,
     duration,
+    ...(body.preview ? { preview: true } : {}),
     draft,
     cues,
   };
 }
-export function trustedLocalRequest(req) {
+export function trustedLocalRequest(req, options = {}) {
+  const allowedHosts = new Set(
+    options.allowedHosts || ["localhost:5190", "127.0.0.1:5190"],
+  );
+  const allowedOrigins = new Set(
+    options.allowedOrigins || [
+      "http://localhost:5190",
+      "http://127.0.0.1:5190",
+    ],
+  );
   return (
-    /^(localhost|127\.0\.0\.1):5190$/.test(req.headers.host || "") &&
-    (!req.headers.origin ||
-      ["http://localhost:5190", "http://127.0.0.1:5190"].includes(
-        req.headers.origin,
-      )) &&
+    allowedHosts.has(req.headers.host || "") &&
+    (!req.headers.origin || allowedOrigins.has(req.headers.origin)) &&
     !["cross-site", "same-site"].includes(req.headers["sec-fetch-site"])
   );
 }
@@ -218,6 +243,8 @@ export function createVisualizerExports({
     projectRoot,
     "scripts/video/visualizer-export-worker.mjs",
   ),
+  allowedHosts,
+  allowedOrigins,
 }) {
   mkdirSync(outputRoot, { recursive: true });
   const jobs = new Map();
@@ -278,6 +305,8 @@ export function createVisualizerExports({
     selection: job.input.draft.visualizer,
     aspect: job.input.draft.aspect,
     lyrics: job.input.draft.showLyrics,
+    preview: !!job.input.preview,
+    artworkId: job.input.draft.reactiveArtworkId || null,
     downloadUrl:
       job.state === "succeeded"
         ? `/local-api/visualizer-renders/${job.id}/video?download=1`
@@ -378,19 +407,68 @@ export function createVisualizerExports({
       );
       const width = job.input.draft.aspect === "9:16" ? 1080 : 1920,
         height = job.input.draft.aspect === "9:16" ? 1920 : 1080;
+      let scene;
+      if (job.input.draft.reactiveMode === "song") {
+        const artId = job.input.draft.reactiveArtworkId;
+        const path = `/api/takes/${job.input.takeId}/reactive-artwork/${artId}`;
+        const artworkJob = await (await remote(path, signal)).json();
+        if (
+          artworkJob.state !== "succeeded" ||
+          artworkJob.kind !== "reactive-artwork"
+        )
+          throw Error("The song artwork must finish before rendering.");
+        scene = validateScene(artworkJob.result);
+        if (
+          scene.takeId !== job.input.takeId ||
+          scene.artworkJobId !== artId ||
+          scene.aspect !== job.input.draft.aspect
+        )
+          throw Error(
+            "The artwork belongs to a different song or frame shape.",
+          );
+        const image = await remote(path + "/image", signal);
+        if (Number(image.headers.get("content-length") || 0) > 28 * 1024 ** 2)
+          throw Error("Artwork exceeds the export limit");
+        const chunks = [];
+        let imageBytes = 0;
+        for await (const chunk of image.body) {
+          imageBytes += chunk.length;
+          if (imageBytes > 28 * 1024 ** 2)
+            throw Error("Artwork exceeds the export limit");
+          chunks.push(chunk);
+        }
+        const bytes = Buffer.concat(chunks);
+        if (
+          createHash("sha256").update(bytes).digest("hex") !==
+          scene.artworkSha256
+        )
+          throw Error("The artwork does not match its saved composition.");
+        writeFileSync(join(work, "artwork.png"), bytes);
+        atomic(join(work, "scene.json"), scene);
+      }
+      const reference = scene?.renderer === "reference-player-v1";
+      if (job.input.preview && !reference)
+        throw Error("Create new song artwork to use the motion preview.");
+      if (reference && job.input.draft.showLyrics)
+        throw Error("Turn off Show lyrics for this photographic player. Lyrics still guide the artwork.");
+      const sourceStart = job.input.preview ? Math.min(30, duration / 4) : 0;
+      const renderDuration = job.input.preview ? Math.min(8, duration - sourceStart) : duration;
       atomic(join(work, "config.json"), {
         ...job.input,
         title: job.title,
         sourceDuration,
-        duration,
+        duration: renderDuration,
+        songDuration: duration,
+        sourceStart,
         width,
         height,
+        scene,
         schedule: visualizerSchedule(duration, job.input.draft.visualizer),
       });
       update(job, {
         phase: "Analyzing the song",
-        duration,
-        totalFrames: Math.ceil(duration * 24),
+        duration: renderDuration,
+        totalFrames: Math.ceil(renderDuration * (reference ? 30 : 24)),
       });
       if (abort.signal.aborted) throw Error("Cancelled");
       const child = spawn(
@@ -485,7 +563,7 @@ export function createVisualizerExports({
     const url = new URL(req.url, "http://127.0.0.1:5190");
     if (!url.pathname.startsWith("/local-api/visualizer-renders"))
       return next();
-    if (!trustedLocalRequest(req))
+    if (!trustedLocalRequest(req, { allowedHosts, allowedOrigins }))
       return send(res, 403, { detail: "Forbidden" });
     try {
       const parts = url.pathname.split("/").filter(Boolean),
@@ -498,6 +576,7 @@ export function createVisualizerExports({
         return send(res, 200, {
           available: !!backend,
           renderer: renderHost,
+          capabilities: { songScenes: 1, referencePlayer: 1, motionPreviews: 1 },
           jobs: [...jobs.values()]
             .filter((j) => !takeId || j.input.takeId === takeId)
             .sort((a, b) => b.created - a.created)
@@ -536,7 +615,7 @@ export function createVisualizerExports({
           signature,
           created,
           updated: created,
-          title: "Visualizer video",
+          title: "Song Reactive Visualizer",
           state: "queued",
           phase: "Queued for local rendering",
           error: null,

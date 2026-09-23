@@ -1,1 +1,1 @@
-export { MusicStudio as App } from "./music-studio/MusicStudio";
+export { MusicStudio as App } from "./studio/MusicStudio";

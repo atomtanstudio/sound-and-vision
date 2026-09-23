@@ -1,0 +1,21 @@
+@import "./navigation-base.css";
+
+/* A quiet, classic hover: tonal wash, fine outline, and an amber icon. */
+.mainnav-item {
+  border: 1px solid transparent;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.mainnav-item:not(.on):hover {
+  color: var(--ink);
+  background: var(--glass);
+  border-color: var(--hair);
+}
+
+.mainnav-item:not(.on):hover svg {
+  color: var(--iris);
+}

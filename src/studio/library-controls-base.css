@@ -1,0 +1,59 @@
+.lib-search .input,
+.lib-toolbar .select,
+.lib-filter-select {
+  border-radius: var(--r-sm);
+}
+
+.lib-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lib-filter .select {
+  min-width: 132px;
+}
+
+.lib-filter:first-of-type .select {
+  min-width: 148px;
+}
+
+.lib-selection-bar {
+  border-radius: var(--r-md);
+}
+
+.lib-selection-bar .select {
+  border-radius: var(--r-sm);
+}
+
+.lib-all-section {
+  margin-top: 34px;
+}
+
+.lib-subhead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.lib-subhead h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.lib-subhead span {
+  color: var(--ink-3);
+  font-size: 12px;
+}

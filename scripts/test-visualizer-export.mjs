@@ -42,6 +42,15 @@ const input = () => ({
     lyrics: "",
   },
 });
+test("motion previews are explicit, song-owned, and do not change full-export identity", () => {
+  const body = input();
+  assert.equal(Object.hasOwn(validateExport(body), "preview"), false);
+  assert.throws(() => validateExport({ ...body, preview: true }), /song artwork/);
+  body.draft.reactiveMode = "song";
+  body.draft.reactiveArtworkId = "artwork-version-one";
+  assert.equal(validateExport({ ...body, preview: true }).preview, true);
+  assert.throws(() => validateExport({ ...body, preview: "yes" }), /preview option/);
+});
 test("all eight styles cover the whole song equally without gaps or lost final frames", () => {
   for (const seconds of [1, 8, 180, 191.359, 265.438667, 3599.999]) {
     const schedule = visualizerSchedule(seconds, "all");

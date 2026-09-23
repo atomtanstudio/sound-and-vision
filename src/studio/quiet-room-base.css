@@ -1,0 +1,430 @@
+/*
+ * Quiet Room — an editorial control-room skin for the Music Studio layout.
+ *
+ * The page structure and component behavior stay in the supplied alternate
+ * front end. This layer changes only the visual language so the mock-up is
+ * easy to compare with the original version and easy to remove later.
+ */
+
+:root {
+  --font-ui: "Space Grotesk Variable", "Space Grotesk", ui-sans-serif,
+    system-ui, sans-serif;
+  --font-serif: "Newsreader Variable", "Newsreader", Georgia, serif;
+  --font-lyric: "Newsreader Variable", "Newsreader", Georgia, serif;
+  --r-sm: 6px;
+  --r-md: 9px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --topbar-h: 68px;
+}
+
+:root[data-theme="dark"] {
+  --canvas: #11110f;
+  --canvas-2: #191815;
+  --ink: #f0ede5;
+  --ink-2: #aaa59a;
+  --ink-3: #746f65;
+  --glass: rgba(245, 237, 218, 0.035);
+  --glass-2: rgba(245, 237, 218, 0.075);
+  --glass-3: rgba(245, 237, 218, 0.12);
+  --panel: #1a1916;
+  --hair: rgba(245, 237, 218, 0.13);
+  --hair-2: rgba(245, 237, 218, 0.25);
+  --iris: #e1a35d;
+  --aqua: #9caf91;
+  --magenta: #c47761;
+  --gold: #e1a35d;
+  --ok: #9caf91;
+  --warn: #e1a35d;
+  --err: #c47761;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  --lift: rgba(255, 250, 235, 0.04);
+  --pool-1: rgba(225, 163, 93, 0.04);
+  --pool-2: rgba(156, 175, 145, 0.025);
+  --pool-3: rgba(196, 119, 97, 0.02);
+  --grain-op: 0.34;
+}
+
+:root[data-theme="light"] {
+  --canvas: #ebe8e0;
+  --canvas-2: #f4f1e9;
+  --ink: #211f1a;
+  --ink-2: #625e55;
+  --ink-3: #918b80;
+  --glass: rgba(255, 253, 246, 0.48);
+  --glass-2: rgba(255, 253, 246, 0.76);
+  --glass-3: rgba(33, 31, 26, 0.08);
+  --panel: #f3f0e8;
+  --hair: rgba(33, 31, 26, 0.14);
+  --hair-2: rgba(33, 31, 26, 0.26);
+  --iris: #b86e32;
+  --aqua: #668166;
+  --magenta: #ad6651;
+  --gold: #b86e32;
+  --ok: #668166;
+  --warn: #b86e32;
+  --err: #ad6651;
+  --shadow: 0 22px 60px rgba(80, 67, 44, 0.14);
+  --lift: rgba(255, 255, 255, 0.52);
+  --pool-1: rgba(184, 110, 50, 0.04);
+  --pool-2: rgba(102, 129, 102, 0.035);
+  --pool-3: rgba(173, 102, 81, 0.025);
+  --grain-op: 0.16;
+}
+
+body {
+  letter-spacing: -0.006em;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.32;
+  background-image: linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% - 1px),
+    var(--hair) calc(100% - 1px)
+  );
+  background-size: 84px 100%;
+  mask-image: linear-gradient(to bottom, #000, transparent 72%);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--iris) 42%, transparent);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 3px;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 520;
+}
+
+h1 {
+  letter-spacing: -0.045em;
+}
+
+h1 em,
+.hero h1 em {
+  color: var(--iris);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+.ambient {
+  opacity: 0.55;
+}
+
+.ambient .glow {
+  display: none;
+}
+
+.ambient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.34;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 35px,
+      var(--hair) 36px,
+      transparent 37px
+    ),
+    linear-gradient(90deg, transparent 0 12%, color-mix(in srgb, var(--iris) 5%, transparent) 12.1%, transparent 12.2%);
+  mask-image: linear-gradient(to bottom, #000 0, transparent 80%);
+}
+
+.topbar {
+  padding: 10px 20px 0;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 94%, transparent), transparent);
+}
+
+.topbar-inner {
+  height: calc(var(--topbar-h) - 10px);
+  gap: 16px;
+  padding: 0 12px 0 18px;
+  border-radius: var(--r-md);
+  border-color: var(--hair-2);
+  background: color-mix(in srgb, var(--canvas-2) 96%, transparent);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18), inset 0 1px 0 var(--lift);
+}
+
+.wordmark-sound {
+  letter-spacing: 0.16em;
+}
+
+.wordmark-vision {
+  color: var(--iris);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+.mainnav {
+  gap: 5px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+}
+
+.mainnav-item {
+  position: relative;
+  border-radius: var(--r-sm);
+  padding: 8px 13px;
+  color: var(--ink-2);
+}
+
+.mainnav-item.on {
+  color: var(--ink);
+  background: var(--glass-2);
+  box-shadow: inset 0 -2px 0 var(--iris);
+}
+
+.mainnav-item.on::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 3px;
+  height: 1px;
+  background: color-mix(in srgb, var(--iris) 70%, transparent);
+}
+
+.engine-chip {
+  border-radius: var(--r-sm);
+  padding: 6px 9px;
+  background: transparent;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.engine-chip.live i {
+  box-shadow: none;
+}
+
+.icon-btn {
+  border-radius: var(--r-sm);
+  background: transparent;
+}
+
+.page {
+  width: min(1320px, 100%);
+  padding: calc(var(--topbar-h) + 38px) 30px 178px;
+}
+
+.page-head {
+  margin-bottom: 26px;
+}
+
+.section-head {
+  margin-top: 42px;
+}
+
+.kicker {
+  letter-spacing: 0.2em;
+}
+
+.panel {
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.17), inset 0 1px 0 var(--lift);
+}
+
+.panel-head h2 svg {
+  color: var(--iris);
+}
+
+.btn {
+  border-radius: var(--r-sm);
+}
+
+.btn-primary {
+  background: var(--iris);
+  color: #18140e;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--iris) 20%, transparent);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.06);
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.input {
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--canvas-2) 88%, transparent);
+}
+
+.input:focus {
+  border-color: var(--iris);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--iris) 18%, transparent);
+}
+
+.toggle-knob,
+.segmented,
+.segmented-item,
+.chip,
+.lora-chip,
+.more-link {
+  border-radius: var(--r-sm);
+}
+
+.toggle.on .toggle-knob {
+  background: var(--iris);
+  border-color: var(--iris);
+}
+
+.segmented {
+  background: transparent;
+}
+
+.segmented-item.on {
+  background: var(--glass-2);
+  box-shadow: inset 0 -2px 0 var(--iris);
+}
+
+.chip.on {
+  background: var(--iris);
+  color: #18140e;
+  border-color: var(--iris);
+  box-shadow: none;
+}
+
+.stat,
+.session,
+.account-card,
+.picker-row,
+.asset-tile {
+  border-radius: var(--r-md);
+  background: transparent;
+}
+
+.stat {
+  padding: 14px 18px;
+}
+
+.stat-icon {
+  border-radius: var(--r-sm);
+  color: var(--iris);
+  background: color-mix(in srgb, var(--iris) 10%, transparent);
+  border-color: color-mix(in srgb, var(--iris) 28%, transparent);
+}
+
+.session:hover,
+.picker-row:hover {
+  border-color: color-mix(in srgb, var(--iris) 48%, var(--hair));
+  background: var(--glass);
+}
+
+.cover-art {
+  border-radius: var(--r-md);
+  background: linear-gradient(145deg, #4a4134, #191714 74%);
+}
+
+.cover-live.running::after {
+  background: conic-gradient(from var(--angle), transparent, var(--iris), transparent 45%, var(--iris), transparent);
+}
+
+.equalizer i {
+  background: var(--iris);
+}
+
+.dot-ok,
+.dot-live {
+  box-shadow: none;
+}
+
+.progress-ring .ring-value {
+  stroke: var(--iris);
+}
+
+.empty {
+  border-radius: var(--r-lg);
+}
+
+.empty-icon {
+  border-radius: var(--r-sm);
+  color: var(--iris);
+}
+
+.modal-card {
+  border-radius: var(--r-lg);
+  background: var(--canvas-2);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.toast {
+  border-radius: var(--r-sm);
+  border-left-color: var(--iris);
+  background: var(--canvas-2);
+}
+
+.dock {
+  border-radius: var(--r-lg);
+  border-top: 2px solid var(--iris);
+  background: var(--canvas-2);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+.dock-play {
+  border-radius: var(--r-sm);
+  background: var(--iris);
+  color: #18140e;
+  box-shadow: none;
+}
+
+.dock-fav.on {
+  color: var(--iris);
+}
+
+.dock-transport .icon-btn {
+  border-radius: var(--r-sm);
+}
+
+.dock-scrub input[type="range"],
+.dock-volume input[type="range"],
+.video-controls input[type="range"],
+.check-row input {
+  accent-color: var(--iris);
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    padding-inline: 10px;
+  }
+
+  .topbar-inner {
+    padding-left: 13px;
+  }
+
+  .page {
+    padding-inline: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient::after,
+  body::before {
+    opacity: 0.16;
+  }
+}

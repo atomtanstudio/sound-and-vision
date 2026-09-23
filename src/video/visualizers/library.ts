@@ -1,5 +1,7 @@
 /** Original Sound/Vision visualizers. SPDX-License-Identifier: Apache-2.0 */
-export type VisualizerPresetId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type VisualizerPresetId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export const SONG_REACTIVE_LABEL = "Song Reactive Visualizer";
+export const INK_PRESET = 8;
 export type VisualizerAudioFrame = {
   /** Exact output-video timestamp, seconds. */
   time: number;
@@ -9,9 +11,14 @@ export type VisualizerAudioFrame = {
   treble: number;
   onset: number;
   energy: number;
+  tick?: number;
+  breath?: number;
+  /** Seconds since the most recent measured bass transient. */
+  age?: number;
+  spectrum?: number[];
 };
 export type VisualizerAnalysis = {
-  version: 1;
+  version: 1 | 2;
   fps: number;
   duration: number;
   frames: VisualizerAudioFrame[];
@@ -36,6 +43,13 @@ export const originalVisualizerPresets = [
   { id: 5, name: "Silk", description: "Luminous flowing ribbon surfaces" },
   { id: 6, name: "Facet", description: "Refractive crystal cluster" },
   { id: 7, name: "Afterimage", description: "Warm analog wave interference" },
+  {
+    id: 8,
+    name: "Ink, suspended",
+    description: "Translucent folds shaped by your song",
+  },
 ] as const;
+export const classicVisualizerPresets = originalVisualizerPresets.slice(0, 8);
+export const inkShaderUrl = "/visualizers/ink-suspended.frag";
 export const visualizerShaderUrl = "/visualizers/collection.frag";
 export const visualizerPreviewUrl = "/visualizers/index.html";

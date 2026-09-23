@@ -1,0 +1,24 @@
+@import "./library-controls-base.css";
+
+.lib-search .input,
+.lib-filter .select,
+.lib-filter-select {
+  height: 32px;
+  min-height: 32px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-size: 13px;
+}
+
+.lib-search .input {
+  padding-left: 32px;
+}
+
+.lib-search svg {
+  left: 11px;
+}
+
+.lib-filter .select,
+.lib-filter-select {
+  padding-right: 30px;
+}

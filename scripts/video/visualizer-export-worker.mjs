@@ -23,7 +23,9 @@ if (
 )
   throw Error("Invalid local renderer invocation");
 const config = JSON.parse(readFileSync(join(work, "config.json"), "utf8"));
-const totalFrames = Math.ceil(config.duration * 24);
+const reference = config.scene?.renderer === "reference-player-v1";
+const fps = reference ? 30 : 24;
+const totalFrames = Math.ceil(config.duration * fps);
 const began = Date.now();
 function progress(phase, frames = 0) {
   const p = join(work, "progress.json");
@@ -81,6 +83,17 @@ function launchPath() {
   );
 }
 try {
+  const partial = join(work, "video.partial.mp4");
+  const native = !reference && process.platform === "darwin" && !config.draft.showLyrics;
+  if (reference) {
+    progress("Preparing photographic player");
+    const python = process.env.SOUND_VISION_VISUALIZER_PYTHON ||
+      (existsSync("/srv/ai/sound-vision/.venv/bin/python") ? "/srv/ai/sound-vision/.venv/bin/python" : "python3");
+    analyzer = spawn(python, [resolve("scripts/video/reference_player.py"), "--work", work],
+      { stdio: ["ignore", "inherit", "inherit"] });
+    const [code] = await once(analyzer, "close");
+    if (code !== 0) throw Error("Photographic player rendering failed; worker log retained.");
+  } else {
   progress("Analyzing the song");
   analyzer = spawn(
     process.execPath,
@@ -92,13 +105,13 @@ try {
       join(work, "analysis.json"),
       "--fps",
       "24",
+      "--style",
+      config.draft.visualizer,
     ],
     { stdio: ["ignore", "inherit", "inherit"] },
   );
   const [analyzed] = await once(analyzer, "close");
   if (analyzed !== 0) throw Error("Audio analysis failed");
-  const partial = join(work, "video.partial.mp4");
-  const native = process.platform === "darwin" && !config.draft.showLyrics;
   if (native) {
     progress("Preparing accelerated rendering");
     analyzer = spawn(
@@ -123,6 +136,14 @@ try {
         String(config.draft.visualizerStrength),
         "--shade",
         String(config.draft.shade),
+        ...(config.scene
+          ? [
+              "--scene",
+              join(work, "scene.json"),
+              "--artwork",
+              join(work, "artwork.png"),
+            ]
+          : []),
         "--progress",
         join(work, "progress.json"),
         ...(config.draft.audioFade
@@ -157,6 +178,10 @@ try {
     const analysis = JSON.parse(
       readFileSync(join(work, "analysis.json"), "utf8"),
     );
+    if (config.scene)
+      config.scene.artworkUrl =
+        "data:image/png;base64," +
+        readFileSync(join(work, "artwork.png")).toString("base64");
     let pageError = null;
     const pages = await Promise.all(
       Array.from({ length: 4 }, async () => {
@@ -242,7 +267,8 @@ try {
         "-b:a",
         "256k",
         "-af",
-        ffmpegAudioFadeFilter(config.draft.audioFade, config.duration),
+        (config.draft.visualizer === "8" ? "volume=-1.5dB," : "") +
+          ffmpegAudioFadeFilter(config.draft.audioFade, config.duration),
         "-frames:v",
         String(totalFrames),
         "-movflags",
@@ -299,6 +325,7 @@ try {
     const [code] = await finished;
     if (code !== 0) throw Error("MP4 encoder failed");
   }
+  }
   const media = JSON.parse(
     execFileSync(
       "ffprobe",
@@ -311,10 +338,10 @@ try {
   if (
     !v ||
     !a ||
-    Number(v.nb_frames) !== totalFrames ||
+    Math.abs(Number(v.nb_frames) - totalFrames) > (reference ? 1 : 0) ||
     v.width !== config.width ||
     v.height !== config.height ||
-    Math.abs(Number(media.format.duration) - config.duration) > 1 / 24 + 0.01 ||
+    Math.abs(Number(media.format.duration) - config.duration) > 1 / fps + 0.01 ||
     Math.abs(Number(a.duration) - config.duration) > 0.05
   )
     throw Error("Export failed duration, audio, or frame verification");
@@ -325,8 +352,8 @@ try {
       {
         width: v.width,
         height: v.height,
-        fps: 24,
-        frames: totalFrames,
+        fps,
+        frames: Number(v.nb_frames),
         duration: Number(media.format.duration),
         audioDuration: Number(a.duration),
         audioChannels: a.channels,
@@ -336,9 +363,11 @@ try {
         lyrics: config.draft.showLyrics,
         strength: config.draft.visualizerStrength,
         renderSeconds: (Date.now() - began) / 1000,
-        renderer: native ? "native-opengl" : "browser-webgl",
+        renderer: reference ? "reference-player-v1" : native ? "native-opengl" : "browser-webgl",
         gpuRenderer,
-        encoder: useNvenc && !native ? "h264_nvenc" : "libx264",
+        encoder: useNvenc && !native && !reference ? "h264_nvenc" : "libx264",
+        preview: !!config.preview,
+        sourceStart: config.sourceStart || 0,
       },
       null,
       2,

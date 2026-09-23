@@ -128,9 +128,9 @@ const vite = spawn(
   [
     "node_modules/vite/bin/vite.js",
     "--host",
-    "127.0.0.1",
+    env.SOUND_VISION_UI_HOST || "127.0.0.1",
     "--port",
-    "5190",
+    env.SOUND_VISION_UI_PORT || "5190",
     "--strictPort",
   ],
   { stdio: "inherit" },

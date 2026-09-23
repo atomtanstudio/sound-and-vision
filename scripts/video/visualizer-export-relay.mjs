@@ -1,7 +1,7 @@
 import { request } from "node:http";
 import { trustedLocalRequest } from "./visualizer-export-api.mjs";
 // The editor proxies jobs and MP4 bytes; all new rendering work stays on Legion.
-export function visualizerRelay({ endpoint, token, legacy }) {
+export function visualizerRelay({ endpoint, token, legacy, allowedHosts, allowedOrigins }) {
   const origin = new URL(endpoint);
   if (
     origin.protocol !== "http:" ||
@@ -20,7 +20,8 @@ export function visualizerRelay({ endpoint, token, legacy }) {
       });
       res.end(JSON.stringify({ detail }));
     };
-    if (!trustedLocalRequest(req)) return fail(403, "Forbidden");
+    if (!trustedLocalRequest(req, { allowedHosts, allowedOrigins }))
+      return fail(403, "Forbidden");
     const id = url.pathname.split("/")[3];
     if (id && legacy.has(id)) return legacy.middleware(req, res, next);
     if (!id && req.method === "GET") {
@@ -83,6 +84,7 @@ export function visualizerRelay({ endpoint, token, legacy }) {
         headers: {
           ...req.headers,
           host: "localhost:5190",
+          origin: "http://localhost:5190",
           authorization: `Bearer ${token}`,
         },
       },

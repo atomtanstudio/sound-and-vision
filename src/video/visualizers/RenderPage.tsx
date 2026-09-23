@@ -9,6 +9,7 @@ import { VisualizerCanvas, type VisualizerDraw } from "./VisualizerCanvas";
 import { LyricOverlay } from "./LyricOverlay";
 import type { VisualizerAnalysis } from "./library";
 import type { VideoDraft, LyricCue } from "../timeline";
+import type { SongScene } from "./scene";
 
 declare global {
   interface Window {
@@ -25,6 +26,7 @@ type Config = {
   duration: number;
   width: number;
   height: number;
+  scene?: SongScene;
 };
 const style = document.createElement("style");
 style.textContent =
@@ -51,6 +53,7 @@ async function start() {
         }
       >
         <VisualizerCanvas
+          scene={config.scene}
           audioRef={audioRef}
           active={false}
           playing={false}

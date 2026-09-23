@@ -61,13 +61,23 @@ Train compatible YuE2 LoRAs externally, then copy them into the backend computer
 
 ## Library
 
-Use **Library** in the sidebar to find saved songs and completed videos together. Filter by Music or Videos, search by title, play videos inline, download exports, or reopen a song in the video editor. The Music page retains its generation queue and detailed song controls.
+Use **Library** in the top navigation to find saved songs and completed videos together. Filter by Songs or Videos, search by title, play videos inline, download exports, or reopen a song in the video editor. The Music page retains its generation queue and detailed song controls.
+
+## Song Reactive Visualizer
+
+Choose a finished song in **Video → Song Reactive Visualizer**, review its genre/mood and lyrics, and select **Create song artwork**. The app directs a photographic scene and an integrated reactive display from the song; there is no initial preset choice. Earlier artwork versions remain available.
+
+Use **Preview motion** to render an eight-second sample, watch it in the app, then select **Render video** for the full soundtrack. The original spectrum/ribbon renderer measures the recording and exports 1080p at 30 fps. The optional Classic collection retains its eight styles. Short previews stay in the Video workspace; finished full videos appear in the Library.
+
+This photographic recipe uses the connected OpenAI writing/vision and image provider, with bundled quality references. Local image presets do not yet support its reference-image contract. Keep **Show lyrics** off for this format; the lyric sheet still guides the artwork. See [setup, rendering and limitations](docs/backend/SONG_REACTIVE_VISUALIZER.md).
 
 ## Bring your own song
 
 Open **Video → Import song** to use an existing WAV, FLAC, MP3, M4A, or OGG recording (up to 100 MB and 10 minutes). It is saved in **Imported songs**, selected as the soundtrack, and available after reload. Add the lyrics in the video editor and align them for kinetic text, or choose a visualizer without lyrics. Importing does not generate a song. In the visible **Lyrics** section below **Soundtrack**, choose **Transcribe lyrics from song**, correct the editable draft, and select **Use reviewed lyrics** before alignment. Transcription requires the local lyric-alignment runtime. Enable **On-screen lyrics** to access this step in the guided Music video flow. Lip-sync performance remains Coming soon.
 
 ## Create a full-song music video
+
+The refreshed studio keeps this experimental workflow behind `VITE_ENABLE_MUSIC_VIDEO=true`; it appears as **Cinematic** when enabled. Its backend must also have the documented music-video capability enabled. Existing completed videos remain available in Library.
 
 In **Video**, choose a soundtrack and **Music video**. Review the suggested visual theme, choose new footage for the whole song or a smaller repeating set, then select **Prepare video**. Review the clip count and choose **Create video**. The app plans scenes, aligns reviewed lyrics when enabled, renders H3 Turbo clips sequentially, and assembles a downloadable 1080p MP4 with the original audio.
 

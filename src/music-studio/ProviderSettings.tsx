@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { request } from "./api";
+import { createRequestId, request } from "./api";
 
 type Node = { class_type: string; inputs: Record<string, unknown> };
 export type ProviderSettings = {
@@ -190,7 +190,7 @@ export function ProviderSettingsPanel({
     setBusy(true);
     setError("");
     try {
-      const id = crypto.randomUUID();
+      const id = createRequestId();
       const job = await request<NonNullable<typeof test>>("/providers/tests", {
         requestId: id,
         kind,

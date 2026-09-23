@@ -55,10 +55,10 @@ test("private proxy rejects untrusted browser requests before forwarding", async
       );
       assert.equal(response.statusCode, 503); // Valid client; fixture has no backend.
     }
-    assert.deepEqual(config.server.cors.origin, [
-      "http://127.0.0.1:5190",
-      "http://localhost:5190",
-    ]);
+    assert.deepEqual(
+      new Set(config.server.cors.origin),
+      new Set(["http://127.0.0.1:5190", "http://localhost:5190"]),
+    );
     const resolved = await resolveConfig(
       { ...config, root: fixture, configFile: false, envDir: false },
       "serve",

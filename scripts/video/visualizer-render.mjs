@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { visualizerSchedule } from "../../src/video/visualizers/schedule.ts";
 import {
+  validateScene,
+  sceneUniforms,
+} from "../../src/video/visualizers/scene.ts";
+import {
   ffmpegAudioFadeFilter,
   normalizeAudioFade,
 } from "../../src/video/audioFade.ts";
@@ -29,6 +33,15 @@ if (process.platform !== "darwin")
     "Native renderer currently requires macOS CGL. The WebGL preview is portable.",
   );
 const analysis = JSON.parse(await readFile(resolve(args.analysis), "utf8"));
+const artworkScene = args.scene
+  ? validateScene(JSON.parse(await readFile(resolve(args.scene), "utf8")))
+  : null;
+if (artworkScene) args.visualizer = "8";
+const ink = args.visualizer === "8";
+if (ink && analysis.version !== 2)
+  throw Error(
+    "Ink, suspended requires song analysis v2. Analyze with --style 8.",
+  );
 const fps = Number(analysis.fps ?? 24),
   width = Number(args.width ?? 1920),
   height = Number(args.height ?? 1080);
@@ -85,7 +98,7 @@ if (
   throw Error("Invalid strength or shade");
 if (
   !sequence.length ||
-  sequence.some((v) => !Number.isInteger(v) || v < 0 || v > 7)
+  sequence.some((v) => !Number.isInteger(v) || v < 0 || v > (ink ? 8 : 7))
 )
   throw Error("Invalid preset sequence");
 const interval = Number(args.interval ?? 20),
@@ -151,16 +164,79 @@ const rows = analysis.frames
         throw Error(`Invalid ${key} at frame ${index}`);
       return Math.max(0, Math.min(1, value));
     });
-    return [time, ...features, preset, next, blend].join(",");
+    const detail = ink
+      ? [frame.tick, frame.breath, frame.age, ...(frame.spectrum || [])]
+      : [];
+    if (
+      ink &&
+      (detail.length !== 27 ||
+        detail.some(
+          (value) => typeof value !== "number" || !Number.isFinite(value),
+        ))
+    )
+      throw Error(`Incomplete song features at frame ${index}`);
+    return [time, ...features, preset, next, blend, ...detail].join(",");
   })
   .join("\n");
 await writeFile(framePath, rows + "\n");
 const source = resolve(root, "scripts/video/visualizer-native.cpp"),
-  shader = resolve(root, "public/visualizers/collection.frag");
+  shader = resolve(
+    root,
+    artworkScene
+      ? "public/visualizers/song-scene.frag"
+      : ink
+        ? "public/visualizers/ink-suspended.frag"
+        : "public/visualizers/collection.frag",
+  );
 const shaderBytes = await readFile(shader);
 const shaderDigest = createHash("sha256").update(shaderBytes).digest("hex");
 const shaderSnapshot = output + ".shader.frag";
 await writeFile(shaderSnapshot, shaderBytes);
+const artworkArgs = [];
+if (artworkScene) {
+  if (!args.artwork) throw Error("A song scene requires its saved artwork");
+  const raw = output + ".artwork.rgb",
+    metadata = output + ".artwork.txt";
+  const decoded = spawnSync(
+    "ffmpeg",
+    [
+      "-v",
+      "error",
+      "-y",
+      "-i",
+      resolve(args.artwork),
+      "-frames:v",
+      "1",
+      "-f",
+      "rawvideo",
+      "-pix_fmt",
+      "rgb24",
+      raw,
+    ],
+    { stdio: "inherit" },
+  );
+  if (decoded.status !== 0) throw Error("Could not decode artwork");
+  const [aw, ah] = artworkScene.dimensions;
+  if ((await stat(raw)).size !== aw * ah * 3)
+    throw Error("Artwork dimensions differ from its saved composition");
+  const values = sceneUniforms(artworkScene);
+  await writeFile(
+    metadata,
+    [
+      aw,
+      ah,
+      values.length,
+      duration,
+      ...values.flatMap((s) => [
+        ...s.transform,
+        ...s.style,
+        ...s.color,
+        ...s.accent,
+      ]),
+    ].join(" "),
+  );
+  artworkArgs.push(metadata, raw);
+}
 const cache = resolve("/private/tmp/soundvision-visualizer");
 await mkdir(cache, { recursive: true });
 const digest = createHash("sha256")
@@ -217,7 +293,7 @@ if (args.audio)
     "-map",
     "1:a:0",
     "-af",
-    ffmpegAudioFadeFilter(audioFade, duration),
+    (ink ? "volume=-1.5dB," : "") + ffmpegAudioFadeFilter(audioFade, duration),
     "-c:a",
     "aac",
     "-b:a",
@@ -235,6 +311,7 @@ const renderer = spawn(
     String(height),
     String(strength),
     String(shade / 100),
+    ...artworkArgs,
   ],
   { stdio: ["ignore", "pipe", "pipe"] },
 );
@@ -320,6 +397,18 @@ const report = {
   frameCount: count,
   encodedDuration: Number(encoded.duration),
   shaderSha256: shaderDigest,
+  ...(artworkScene
+    ? {
+        composition: "song-artwork",
+        concept: artworkScene.concept,
+        artworkSha256: artworkScene.artworkSha256,
+        surfaces: artworkScene.surfaces.map((s) => ({
+          name: s.name,
+          effect: s.effect,
+          corners: s.corners,
+        })),
+      }
+    : {}),
   shaderSource: shaderSnapshot,
   analysis: resolve(args.analysis),
   output,

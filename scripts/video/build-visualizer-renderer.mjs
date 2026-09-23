@@ -18,3 +18,11 @@ await copyFile(
   "public/visualizers/collection.frag",
   resolve(outDir, "visualizers/collection.frag"),
 );
+await copyFile(
+  "public/visualizers/ink-suspended.frag",
+  resolve(outDir, "visualizers/ink-suspended.frag"),
+);
+await copyFile(
+  "public/visualizers/song-scene.frag",
+  resolve(outDir, "visualizers/song-scene.frag"),
+);

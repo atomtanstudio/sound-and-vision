@@ -14,6 +14,8 @@ Deploy the built composition, `scripts/video/{visualizer-export-server,visualize
 
 ## Browser sandbox setup
 
+The new [photographic song renderer](SONG_REACTIVE_VISUALIZER.md) also needs `scripts/video/reference_player.py`, `src/video/visualizers/scene.ts`, `src/video/visualizers/songAnalysis.ts` and `src/video/audioFade.ts`, plus the matching backend artwork modules/references. It uses the existing Python environment with NumPy/Pillow, installed DejaVu/Liberation Mono, and FFmpeg/libx264 at 30 fps. It does not launch Chromium or require the NVIDIA rendering path. The browser/GPU instructions below apply to the retained classic and legacy scene workflows.
+
 Ubuntu restricts unprivileged user namespaces. Its installed Chrome profile applies only to `/opt/google/chrome/chrome`, so the Playwright browser currently requires the specific profile in `deploy/sound-vision-renderer.apparmor`. This enables Chromium's own sandbox for that executable while leaving the global restriction enabled. Install through an authorized administrator:
 
 ```sh

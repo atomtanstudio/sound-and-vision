@@ -58,6 +58,7 @@ import { LyricTimelineEditor } from "./LyricTimelineEditor";
 import { VisualizerCanvas } from "./visualizers/VisualizerCanvas";
 import { LyricOverlay } from "./visualizers/LyricOverlay";
 import { VisualizerExports } from "./visualizers/VisualizerExports";
+import { KineticExports } from "./KineticExports";
 import {
   presetNumber,
   visualizerFrame,
@@ -66,6 +67,7 @@ import {
 import { DirectedVideoWorkspace } from "./DirectedVideoWorkspace";
 import {
   originalVisualizerPresets,
+  SONG_REACTIVE_LABEL,
   visualizerPreviewUrl,
 } from "./visualizers/library";
 import {
@@ -114,7 +116,7 @@ const options = [
   },
   {
     id: "visualizer",
-    title: "Visualizer video",
+    title: SONG_REACTIVE_LABEL,
     note: "Audio-reactive visuals, optional lyrics",
     icon: AudioLines,
   },
@@ -1149,7 +1151,7 @@ function VideoEditor({
             </div>
             <p className="video-field-note">
               {draft.aspect === "9:16" ? "1080 × 1920" : "1920 × 1080"} · 24 fps
-              {draft.kind === "visualizer" ? "MP4 output" : "output plan"}
+              {draft.kind === "directed" ? "output plan" : "MP4 output"}
             </p>
           </fieldset>
           {draft.kind === "directed" ? (
@@ -1194,7 +1196,7 @@ function VideoEditor({
             <>
               {draft.kind === "visualizer" && (
                 <fieldset className="video-control-section">
-                  <legend>Visualizer</legend>
+                  <legend>{SONG_REACTIVE_LABEL}</legend>
                   <label>
                     Visual style
                     <select
@@ -1212,7 +1214,7 @@ function VideoEditor({
                       }
                     >
                       <option value="all">
-                        All visualizers — equal time across the song
+                        Classic collection — all eight, equal time
                       </option>
                       {originalVisualizerPresets.map((preset) => (
                         <option key={preset.id} value={String(preset.id)}>
@@ -1632,7 +1634,7 @@ function VideoEditor({
                 {draft.kind === "kinetic"
                   ? "Kinetic lyric video preview"
                   : draft.kind === "visualizer"
-                    ? "Visualizer video preview"
+                    ? "Song Reactive Visualizer preview"
                     : "Music video treatment"}
               </span>
               <label className="video-checkbox">
@@ -1662,6 +1664,7 @@ function VideoEditor({
                 {draft.kind === "visualizer" ? (
                   <VisualizerCanvas
                     audioRef={audioRef}
+                    analysisUrl={track.source ? `/api/takes/${track.id}/files/audio.flac` : track.audioUrl || `/media/desert-afterglow-${track.audio}.mp3`}
                     active={active}
                     playing={previewPlaying}
                     time={position}
@@ -1900,7 +1903,7 @@ function VideoEditor({
               <p>
                 {draft.kind === "visualizer"
                   ? "Live audio-reactive preview. Render video exports the full song and your saved visual settings to MP4."
-                  : "Generate backgrounds above; finished assets appear in the sequence automatically. MP4 export is not connected yet."}
+                  : "Generate backgrounds above, then render the finished kinetic MP4 below."}
               </p>
             </div>
           </div>
@@ -2088,6 +2091,16 @@ function VideoEditor({
             </p>
           )}
         </section>
+      )}
+      {draft.kind === "kinetic" && (
+        <KineticExports
+          key={track.id}
+          track={track}
+          draft={draft}
+          assets={allAssets}
+          cues={cues}
+          duration={duration}
+        />
       )}
       {timingErrors.length > 0 && (
         <p className="form-error">{timingErrors[0]}</p>

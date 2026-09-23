@@ -1,0 +1,120 @@
+.field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.field-heading .field-label {
+  margin: 0;
+}
+
+.writer-wand {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-3);
+  transition: color 0.18s, background 0.18s, border-color 0.18s;
+}
+
+.writer-wand:hover {
+  color: var(--iris);
+  background: var(--glass);
+  border-color: var(--hair);
+}
+
+.writer-wand:focus-visible {
+  color: var(--iris);
+  border-color: var(--iris);
+  outline: 2px solid color-mix(in srgb, var(--iris) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.writer-wand:disabled {
+  cursor: wait;
+  color: var(--ink-3);
+}
+
+.song-description-field .description-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.song-description-field .text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+}
+
+.song-description-field .text-button:hover {
+  color: var(--iris);
+}
+
+.song-description-field .text-button:focus-visible {
+  outline: 2px solid var(--iris);
+  outline-offset: 3px;
+}
+
+.song-description-field .description-suggestion {
+  padding: 12px;
+  border: 1px solid var(--hair);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.song-description-field .description-suggestion .text-button {
+  margin: 8px 12px 0 0;
+}
+
+.song-description-field .form-error {
+  color: var(--err);
+  font-size: 12px;
+}
+
+.description-spinner {
+  animation: description-spin 1.5s linear infinite;
+}
+
+@keyframes description-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .description-spinner { animation: none; }
+}
+
+.segmented-item {
+  border: 1px solid transparent;
+  transition: color 0.18s, background 0.18s, border-color 0.18s;
+}
+
+.segmented-item.on {
+  color: #18140e;
+  background: var(--iris);
+  border-color: var(--iris);
+  box-shadow: none;
+  font-weight: 650;
+}
+
+.segmented-item:not(.on):hover {
+  color: var(--ink);
+  background: var(--glass);
+  border-color: var(--hair);
+}

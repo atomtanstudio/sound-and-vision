@@ -3,6 +3,11 @@
 import { spawnSync } from "node:child_process";
 import { writeFile, mkdir } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
+import {
+  analyzeSong,
+  songFrame,
+  SONG_SAMPLE_RATE,
+} from "../../src/video/visualizers/songAnalysis.ts";
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((pairs, arg, i, all) => {
     if (arg.startsWith("--")) pairs.push([arg.slice(2), all[i + 1]]);
@@ -14,6 +19,74 @@ if (!args.audio || !args.output) {
     "Usage: node scripts/video/visualizer-analyze.mjs --audio song.wav --output analysis.json [--fps 24]",
   );
   process.exit(1);
+}
+if (args.style === "8") {
+  const fps = Number(args.fps ?? 24);
+  if (!Number.isFinite(fps) || fps < 1 || fps > 120)
+    throw Error("Invalid frame rate");
+  const decoded = spawnSync(
+    "ffmpeg",
+    [
+      "-v",
+      "error",
+      "-i",
+      resolve(args.audio),
+      "-f",
+      "f32le",
+      "-ac",
+      "2",
+      "-ar",
+      String(SONG_SAMPLE_RATE),
+      "pipe:1",
+    ],
+    { maxBuffer: 2 * 1024 ** 3 },
+  );
+  if (decoded.status !== 0)
+    throw Error(
+      decoded.error?.message ||
+        decoded.stderr?.toString() ||
+        "Audio decode failed",
+    );
+  const stereo = new Float32Array(
+    decoded.stdout.buffer,
+    decoded.stdout.byteOffset,
+    decoded.stdout.byteLength / 4,
+  );
+  const mono = new Float32Array(stereo.length / 2);
+  for (let i = 0; i < mono.length; i++)
+    mono[i] = (stereo[i * 2] + stereo[i * 2 + 1]) * 0.5;
+  const measured = analyzeSong(mono);
+  const frames = Array.from(
+    { length: Math.ceil(measured.duration * fps) },
+    (_, i) => songFrame(measured, i / fps),
+  );
+  const result = {
+    version: 2,
+    source: resolve(args.audio),
+    sampleRate: SONG_SAMPLE_RATE,
+    analysisFps: measured.fps,
+    fftSize: 2048,
+    fps,
+    duration: measured.duration,
+    featureMethod:
+      "Shared 120 Hz centered song analysis with 24 bands and independently measured low/high transients; no tempo grid.",
+    frames,
+    onsets: measured.onsets,
+    beats: measured.onsets,
+  };
+  const output = resolve(args.output);
+  await mkdir(dirname(output), { recursive: true });
+  await writeFile(output, JSON.stringify(result) + "\n");
+  console.log(
+    JSON.stringify({
+      output,
+      duration: measured.duration,
+      frames: frames.length,
+      analysisFps: measured.fps,
+      onsets: measured.onsets.length,
+    }),
+  );
+  process.exit(0);
 }
 const fps = Number(args.fps ?? 24),
   sampleRate = 22050,

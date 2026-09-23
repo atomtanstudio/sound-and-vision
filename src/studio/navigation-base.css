@@ -1,0 +1,16 @@
+/* Active navigation is carried by type and icon color, not an underline. */
+.mainnav-item.on {
+  color: var(--iris);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 650;
+}
+
+.mainnav-item.on svg {
+  color: var(--iris);
+}
+
+.mainnav-item.on::after {
+  content: none;
+  display: none;
+}

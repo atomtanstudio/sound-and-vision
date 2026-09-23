@@ -15,7 +15,7 @@ import {
   LoaderCircle,
   Undo2,
 } from "lucide-react";
-import { request } from "./api";
+import { ApiError, createRequestId, request } from "./api";
 import { readLocal, writeLocal, type SongForm } from "./model";
 import {
   applyDescription,
@@ -63,6 +63,16 @@ type Job = {
   };
 };
 export const accountStatus = () => request<AccountStatus>("/openai/account");
+
+function isNotFoundError(error: unknown) {
+  return (
+    (error instanceof ApiError && error.status === 404) ||
+    (typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      (error as { status?: unknown }).status === 404)
+  );
+}
 
 export function AccountPanel({
   account,
@@ -163,6 +173,13 @@ function useJob(storageKey: string) {
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState("");
   const selectedId = useRef(id);
+  function clear(message = "") {
+    selectedId.current = null;
+    writeLocal(storageKey, null);
+    setId(null);
+    setJob(null);
+    setError(message);
+  }
   useEffect(() => {
     if (!id) return;
     let stopped = false,
@@ -177,6 +194,10 @@ function useJob(storageKey: string) {
           timer = setTimeout(poll, 1500);
       } catch (e) {
         if (!stopped && selectedId.current === id) {
+          if (isNotFoundError(e)) {
+            clear("This assistant request is no longer available. Start it again.");
+            return;
+          }
           setError((e as Error).message);
           timer = setTimeout(poll, 5000);
         }
@@ -199,8 +220,16 @@ function useJob(storageKey: string) {
     !!id && (!job || !["succeeded", "failed", "cancelled"].includes(job.state));
   async function cancel() {
     if (!id) return;
-    const result = await request<Job>(`/assistance/${id}/cancel`, {});
-    if (selectedId.current === id) setJob(result);
+    try {
+      const result = await request<Job>(`/assistance/${id}/cancel`, {});
+      if (selectedId.current === id) setJob(result);
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        clear("This assistant request is no longer available. Start it again.");
+        return;
+      }
+      throw e;
+    }
   }
   return { job, id, busy, error, select, cancel };
 }
@@ -210,11 +239,15 @@ export function SongDescription({
   change,
   account,
   connect,
+  label = "Describe your song",
+  inputClassName = "",
 }: {
   form: SongForm;
   change: Dispatch<SetStateAction<SongForm>>;
   account: AccountStatus | null;
   connect: () => void;
+  label?: string;
+  inputClassName?: string;
 }) {
   const work = useJob("sv-description-request");
   const [starting, setStarting] = useState(false),
@@ -284,7 +317,7 @@ export function SongDescription({
       null,
     );
     const id =
-      pending?.signature === signature ? pending.id : crypto.randomUUID();
+      pending?.signature === signature ? pending.id : createRequestId();
     writeLocal("sv-description-submission", { id, signature });
     writeLocal("sv-description-source", { id, source });
     try {
@@ -309,7 +342,7 @@ export function SongDescription({
     <>
       <div className="field-heading">
         <label className="field-label" htmlFor="song-description">
-          Describe your song
+          {label}
         </label>
         <button
           type="button"
@@ -332,7 +365,8 @@ export function SongDescription({
       </div>
       <textarea
         id="song-description"
-        className="description-input"
+        className={`description-input ${inputClassName}`}
+        rows={4}
         value={form.description}
         onChange={(e) => {
           const description = e.target.value;
@@ -525,7 +559,7 @@ export function WritingAssistant({
       null,
     );
     const id =
-      pending?.signature === signature ? pending.id : crypto.randomUUID();
+      pending?.signature === signature ? pending.id : createRequestId();
     writeLocal("sv-writing-submission", { signature, id });
     try {
       const job = await request<Job>("/assistance", {

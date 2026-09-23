@@ -128,7 +128,7 @@ class Assistance:
             context_token = current_job.set(job_id)
             try:
                 async with (
-                    (self.image_limit if kind in {"cover", "video-image", "provider-image"} else self.limit)
+                    (self.image_limit if kind in {"cover", "video-image", "provider-image", "reactive-artwork"} else self.limit)
                     if serialized
                     else contextlib.nullcontext()
                 ):

@@ -4,6 +4,7 @@ import { readFileSync, createReadStream, statSync } from "node:fs";
 import { resolve, relative, extname } from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { createVisualizerExports } from "./visualizer-export-api.mjs";
+import { createKineticExports } from "./kinetic-export-api.mjs";
 const root = process.cwd();
 const token = readFileSync(process.env.SOUND_VISION_TOKEN_FILE, "utf8").trim();
 if (!token) throw Error("Missing render service authentication");
@@ -15,6 +16,14 @@ const exports = createVisualizerExports({
   outputRoot: resolve(root, "data/renders"),
   renderOrigin: "http://127.0.0.1:5192",
   renderHost: "Legion",
+});
+const kinetic = createKineticExports({
+  projectRoot: root,
+  backend: "http://127.0.0.1:5191",
+  token,
+  outputRoot: resolve(root, "data/kinetic-renders"),
+  renderHost: "Legion",
+  pythonPath: "/srv/ai/sound-vision/.venv-alignment/bin/python",
 });
 const mime = {
   ".html": "text/html",
@@ -40,6 +49,22 @@ const server = createServer((req, res) => {
       return res.end('{"detail":"Unauthorized"}');
     }
     void exports.middleware(req, res, () => {
+      res.statusCode = 404;
+      res.end();
+    });
+    return;
+  }
+  if (url.pathname.startsWith("/local-api/kinetic-renders")) {
+    const supplied = Buffer.from(req.headers.authorization || "");
+    const expected = Buffer.from(`Bearer ${token}`);
+    if (
+      supplied.length !== expected.length ||
+      !timingSafeEqual(supplied, expected)
+    ) {
+      res.statusCode = 401;
+      return res.end('{"detail":"Unauthorized"}');
+    }
+    void kinetic.middleware(req, res, () => {
       res.statusCode = 404;
       res.end();
     });
@@ -75,5 +100,6 @@ server.listen(5192, "127.0.0.1", () => {
 for (const signal of ["SIGTERM", "SIGINT"])
   process.once(signal, () => {
     exports.close();
+    kinetic.close();
     server.close();
   });

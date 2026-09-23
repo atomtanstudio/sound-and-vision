@@ -4,7 +4,7 @@ export function presetNumber(selection: string): number {
     ? 2
     : selection === "spectrum"
       ? 4
-      : /^[0-7]$/.test(selection)
+      : /^[0-8]$/.test(selection)
         ? Number(selection)
         : 0;
 }

@@ -17,9 +17,10 @@ files += [str(p.relative_to(root)) for p in (root/'deploy').iterdir() if p.is_fi
 files += [str(p.relative_to(root)) for p in (root/'scripts').iterdir() if p.is_file() and (p.name.startswith(('verify-', 'test-')) or p.name in {'dev-connected.mjs', 'package-selfhost.py', 'capture-studio.mjs'})]
 files += ['scripts/video/'+name for name in '''visualizer-export-api.mjs visualizer-export-relay.mjs
 visualizer-export-server.mjs visualizer-export-worker.mjs visualizer-analyze.mjs visualizer-render.mjs
-visualizer-native.cpp build-visualizer-renderer.mjs compose-music-film.py verify-film.py'''.split()]
+visualizer-native.cpp build-visualizer-renderer.mjs reference_player.py create-reactive-artwork.py
+kinetic-export-api.mjs kinetic-export-relay.mjs render-kinetic-export.py compose-music-film.py verify-film.py'''.split()]
 files += ['docs/backend/'+name for name in '''README.md OPERATIONS.md LOCAL_PROVIDERS.md ASSISTANCE.md
-VIDEO_EDITOR.md VISUALIZER_EXPORT.md VISUALIZER_LIBRARY.md LEGION_VISUALIZER_RENDERER.md
+VIDEO_EDITOR.md VISUALIZER_EXPORT.md VISUALIZER_LIBRARY.md LEGION_VISUALIZER_RENDERER.md SONG_REACTIVE_VISUALIZER.md
 CLASSIC_CREDITS.md submission.schema.json'''.split()]
 for tree in trees:
     files.extend(str(p.relative_to(root)) for p in (root/tree).rglob('*') if p.is_file())

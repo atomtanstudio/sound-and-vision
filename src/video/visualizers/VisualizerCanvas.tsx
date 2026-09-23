@@ -1,7 +1,14 @@
 /** Copyright 2026 Sound/Vision contributors. SPDX-License-Identifier: Apache-2.0 */
-import { useEffect, useRef, type RefObject } from "react";
-import { visualizerShaderUrl, type VisualizerAudioFrame } from "./library";
-import { visualizerAt } from "./schedule";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  inkShaderUrl,
+  visualizerShaderUrl,
+  type VisualizerAudioFrame,
+} from "./library";
+import { presetNumber, visualizerAt } from "./schedule";
+import { sampleSong } from "./songAnalysis";
+import { useSongAnalysis } from "./useSongAnalysis";
+import { sceneUniforms, type SongScene } from "./scene";
 
 export type VisualizerDraw = (
   time: number,
@@ -10,6 +17,9 @@ export type VisualizerDraw = (
 
 export type VisualizerCanvasProps = {
   audioRef: RefObject<HTMLAudioElement | null>;
+  /** Lossless version of the selected soundtrack, also used by the exporter. */
+  analysisUrl?: string;
+  scene?: SongScene;
   active: boolean;
   playing: boolean;
   time: number;
@@ -22,6 +32,11 @@ export type VisualizerCanvasProps = {
   reduceMotion?: boolean;
   className?: string;
   onError?: (message: string) => void;
+  onAnalysis?: (status: {
+    ready: boolean;
+    progress: number;
+    error?: string;
+  }) => void;
 };
 
 type AudioGraph = {
@@ -75,6 +90,40 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const current = useRef(props);
   current.current = props;
+  const scene = props.scene;
+  const ink =
+    !!scene || presetNumber(props.selection || String(props.preset)) === 8;
+  const measured = useSongAnalysis(props.analysisUrl, ink && !props.renderRef);
+  const measuredRef = useRef(measured);
+  measuredRef.current = measured;
+  const [systemReduced, setSystemReduced] = useState(
+    () => matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  const reducedRef = useRef(false);
+  // Accessibility affects interactive previews, never an exported composition.
+  reducedRef.current = props.renderRef
+    ? false
+    : (props.reduceMotion ?? systemReduced);
+  useEffect(() => {
+    const query = matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setSystemReduced(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (ink && !props.renderRef)
+      current.current.onAnalysis?.({
+        ready: !!measured.analysis,
+        progress: measured.progress,
+        error: measured.error,
+      });
+  }, [
+    ink,
+    measured.analysis,
+    measured.progress,
+    measured.error,
+    props.renderRef,
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -93,13 +142,19 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
       program: WebGLProgram | null = null;
     let vertex: WebGLShader | null = null,
       fragment: WebGLShader | null = null;
+    let artworkTexture: WebGLTexture | null = null;
     let observedAudio: HTMLAudioElement | null = null,
       graph: AudioGraph | null = null;
     let previousBass = 0,
       onset = 0,
       lastWall = 0,
       track = "";
-    const bands = new Float32Array(4);
+    const bands = new Float32Array(4),
+      detail = new Float32Array(24),
+      row = new Float32Array(32),
+      zero = new Float32Array(4);
+    let lastDraw = "",
+      lastAnalysis = measuredRef.current.analysis;
     const reset = () => {
       bands.fill(0);
       previousBass = 0;
@@ -124,7 +179,7 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
       observedAudio = audio;
       graph = null;
       track = "";
-      if (audio) {
+      if (audio && !ink) {
         graph = sharedGraph(audio);
         for (const event of events) audio.addEventListener(event, reset);
       }
@@ -159,13 +214,22 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
     } catch (error) {
       fail(error);
     }
-    void fetch(visualizerShaderUrl, { signal: abort.signal })
+    void fetch(
+      scene
+        ? "/visualizers/song-scene.frag"
+        : ink
+          ? inkShaderUrl
+          : visualizerShaderUrl,
+      {
+        signal: abort.signal,
+      },
+    )
       .then((response) => {
         if (!response.ok)
           throw Error(`Visualizer source returned ${response.status}.`);
         return response.text();
       })
-      .then((source) => {
+      .then(async (source) => {
         if (stopped) return;
         vertex = compile(
           gl.VERTEX_SHADER,
@@ -186,6 +250,62 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
             gl.getProgramInfoLog(program) || "Visualizer link failed.",
           );
         gl.useProgram(program);
+        if (scene) {
+          const values = sceneUniforms(scene);
+          const response = await fetch(scene.artworkUrl, {
+            signal: abort.signal,
+          });
+          if (!response.ok) throw Error("Could not load the song artwork.");
+          const bitmap = await createImageBitmap(await response.blob());
+          if (stopped) {
+            bitmap.close();
+            return;
+          }
+          artworkTexture = gl.createTexture();
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, artworkTexture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGB,
+            gl.RGB,
+            gl.UNSIGNED_BYTE,
+            bitmap,
+          );
+          bitmap.close();
+          gl.uniform1i(gl.getUniformLocation(program, "u_artwork"), 0);
+          gl.uniform1i(
+            gl.getUniformLocation(program, "u_surfaceCount"),
+            values.length,
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(program, "u_duration"),
+            props.duration || 1,
+          );
+          values.forEach((surface, i) => {
+            gl.uniformMatrix3fv(
+              gl.getUniformLocation(program!, `u_homography[${i}]`),
+              false,
+              surface.transform,
+            );
+            gl.uniform4fv(
+              gl.getUniformLocation(program!, `u_surfaceStyle[${i}]`),
+              surface.style,
+            );
+            gl.uniform3fv(
+              gl.getUniformLocation(program!, `u_color[${i}]`),
+              surface.color,
+            );
+            gl.uniform3fv(
+              gl.getUniformLocation(program!, `u_accent[${i}]`),
+              surface.accent,
+            );
+          });
+        }
         const uniforms = Object.fromEntries(
           [
             "resolution",
@@ -196,6 +316,11 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
             "preset",
             "nextPreset",
             "blend",
+            "tick",
+            "breath",
+            "age",
+            "bands[0]",
+            "motion",
           ].map((name) => [name, gl.getUniformLocation(program!, "u_" + name)]),
         );
         const draw = (
@@ -214,11 +339,40 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
               track = nextTrack;
               reset();
             }
-            let energy = 0;
+            let energy = 0,
+              tick = 0,
+              breath = 0,
+              age = 3;
+            const timestamp = offline
+              ? offline.time
+              : state.active && audio && Number.isFinite(audio.currentTime)
+                ? audio.currentTime
+                : state.time;
+            detail.fill(0);
             if (offline) {
               const a = offline.audio;
               bands.set([a.bass, a.mid, a.treble, a.onset]);
               energy = a.energy;
+              tick = a.tick ?? 0;
+              breath = a.breath ?? 0;
+              age = a.age ?? 3;
+              if (a.spectrum) detail.set(a.spectrum.slice(0, 24));
+            } else if (ink) {
+              const analysis = measuredRef.current.analysis;
+              if (analysis) {
+                sampleSong(analysis, timestamp, row);
+                bands.set(row.subarray(0, 4));
+                tick = row[4];
+                energy = row[5];
+                breath = row[6];
+                age = row[7] * 3;
+                detail.set(row.subarray(8));
+              } else reset();
+              canvas.dataset.analysis = analysis
+                ? "ready"
+                : measuredRef.current.error
+                  ? "error"
+                  : "loading";
             } else if (
               state.active &&
               state.playing &&
@@ -264,10 +418,15 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
               );
             } else reset();
             const bounds = canvas.getBoundingClientRect();
-            const dpr = Math.min(devicePixelRatio || 1, 1.5);
+            const dpr = state.renderRef
+              ? 1
+              : Math.min(devicePixelRatio || 1, 1.5);
             const width = Math.max(
               1,
-              Math.min(1920, Math.round(bounds.width * dpr)),
+              Math.min(
+                state.renderRef ? 7680 : 1920,
+                Math.round(bounds.width * dpr),
+              ),
             );
             const height = Math.max(
               1,
@@ -278,29 +437,38 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
               canvas.height = height;
               gl.viewport(0, 0, width, height);
             }
-            const timestamp = offline
-              ? offline.time
-              : audio && Number.isFinite(audio.currentTime)
-                ? audio.currentTime
-                : state.time;
             const id = state.selection
               ? visualizerAt(timestamp, state.duration || 0, state.selection)
-              : Math.max(0, Math.min(7, Math.trunc(state.preset)));
-            canvas.dataset.visualizer = String(id);
+              : Math.max(0, Math.min(8, Math.trunc(state.preset)));
+            const signature = `${width}/${height}/${reducedRef.current ? 0 : timestamp}/${id}/${state.strength ?? 1}/${reducedRef.current}/${state.active}/${state.playing}`;
+            if (
+              !offline &&
+              signature === lastDraw &&
+              lastAnalysis === measuredRef.current.analysis
+            ) {
+              frameRequest = requestAnimationFrame(draw);
+              return;
+            }
+            lastDraw = signature;
+            lastAnalysis = measuredRef.current.analysis;
+            canvas.dataset.visualizer = scene ? "song" : String(id);
             gl.uniform2f(uniforms.resolution, width, height);
             // Reduced motion freezes geometry and suppresses beat-driven changes.
             gl.uniform1f(
               uniforms.time,
-              state.reduceMotion ? 0 : Math.max(0, timestamp),
+              reducedRef.current ? 0 : Math.max(0, timestamp),
             );
-            gl.uniform4fv(
-              uniforms.audio,
-              state.reduceMotion ? new Float32Array(4) : bands,
-            );
-            gl.uniform1f(uniforms.energy, state.reduceMotion ? 0 : energy);
+            gl.uniform4fv(uniforms.audio, reducedRef.current ? zero : bands);
+            gl.uniform1f(uniforms.energy, reducedRef.current ? 0 : energy);
+            gl.uniform1f(uniforms.tick, reducedRef.current ? 0 : tick);
+            gl.uniform1f(uniforms.breath, reducedRef.current ? 0 : breath);
+            gl.uniform1f(uniforms.age, reducedRef.current ? 3 : age);
+            gl.uniform1f(uniforms.motion, 1);
+            if (reducedRef.current) detail.fill(0);
+            gl.uniform1fv(uniforms["bands[0]"], detail);
             gl.uniform1f(
               uniforms.strength,
-              state.reduceMotion
+              reducedRef.current
                 ? 0
                 : Math.max(0, Math.min(2, state.strength ?? 1)),
             );
@@ -317,7 +485,10 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
           current.current.renderRef.current = (time, audio) =>
             draw(0, { time, audio });
           current.current.onReady?.();
-        } else frameRequest = requestAnimationFrame(draw);
+        } else {
+          current.current.onReady?.();
+          frameRequest = requestAnimationFrame(draw);
+        }
       })
       .catch((error) => {
         if (!abort.signal.aborted) fail(error);
@@ -325,6 +496,7 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
     return () => {
       stopped = true;
       abort.abort();
+      if (artworkTexture) gl.deleteTexture(artworkTexture);
       cancelAnimationFrame(frameRequest);
       if (current.current.renderRef) current.current.renderRef.current = null;
       unobserve();
@@ -336,7 +508,7 @@ export function VisualizerCanvas(props: VisualizerCanvasProps) {
       // Keep the shared audio graph connected; disconnecting it would mute the
       // app's existing player after this view unmounts.
     };
-  }, []);
+  }, [ink, scene?.artworkUrl, scene?.artworkSha256]);
 
   return (
     <canvas

@@ -1,6 +1,8 @@
 # Visualizer MP4 export
 
-In **Video → Visualizer**, choose a finished library song and a visual style, then use **Render video**. Progress and **Download MP4** appear in the same panel. Rendering continues when leaving the Video page. In Mac mode, the local server must remain running. With the [Legion renderer](LEGION_VISUALIZER_RENDERER.md) configured and verified, jobs continue on Legion even when the editor closes.
+In **Video → Song Reactive Visualizer**, choose a finished library song and create its artwork from the genre and lyrics. The [song-reactive workflow](SONG_REACTIVE_VISUALIZER.md) uses the original photographic renderer at 30 fps and provides an eight-second **Preview motion** before full export. The optional **Classic collection** follows the 24 fps workflow described below.
+
+Progress and **Download MP4** appear in the same panel. Rendering continues when leaving the Video page. In Mac mode, the local server must remain running. With the [Legion renderer](LEGION_VISUALIZER_RENDERER.md) configured and verified, jobs continue on Legion even when the editor closes.
 
 **All visualizers — equal time across the song** uses all eight styles once, in list order. The full song's output frames are partitioned into eight adjacent segments; lengths differ by no more than one frame at 24 fps. There is no beat snapping, repeated cycle, or extra ending. Preview, timeline buttons, exported manifest, and renderer share `src/video/visualizers/schedule.ts`.
 

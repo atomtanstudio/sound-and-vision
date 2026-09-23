@@ -670,6 +670,8 @@ def create_app(settings=None, start_worker=True):
     app.include_router(library_routes(store))
     app.include_router(song_import_routes(store))
     app.include_router(video_routes(assistance, manager))
+    from .song_reactive import routes as song_reactive_routes
+    app.include_router(song_reactive_routes(assistance))
     app.include_router(film_routes(films))
     from .media_library import routes as media_library_routes
     from .vocal_preview import routes as vocal_preview_routes
