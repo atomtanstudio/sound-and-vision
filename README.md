@@ -1,3 +1,8 @@
+> [!WARNING]
+> **Archived: this is the first version of Sound and Vision (September 2026), kept for reference only.**
+> It is no longer maintained and is not the current app. For the current version, use the
+> [`main` branch](https://github.com/atomtanstudio/sound-and-vision/tree/main).
+
 # Sound and Vision
 
 ## Watch Sound and Vision
