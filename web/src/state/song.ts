@@ -28,6 +28,7 @@ export const NEW_SONG: SongDoc = {
   timeSignature: null,
   music3Guidance: null,
   covering: null,
+  mcpOptions: {},
 };
 
 let uid = 0;

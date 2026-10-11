@@ -10,7 +10,7 @@ import uuid
 
 from . import influences
 from .jobs import Context, JobError, Scheduler
-from .music import others, yue2
+from .music import eleven, others, yue2
 from .writers import Writers, WriterError
 from .writers.tasks import split_prompt
 
@@ -77,6 +77,21 @@ def start_other_takes(app, pid: str, model: str, req: yue2.SongRequest) -> dict:
     for seed in yue2.seeds(req):
         take = app.store.create_take(pid, model, {"seed": seed, "sent": sent, "request": req.model_dump()})
         job = app.sched.submit("song.other", {"message": "Waiting its turn"}, pid, take["id"])
+        take = app.store.update_take(take["id"], jobId=job["id"])
+        app.hub.publish("take", take)
+        made.append(take)
+    return {"takes": made, "style": sent["style"], "lyrics": sent["lyrics"]}
+
+
+def start_eleven_takes(app, pid: str, offer: dict, req: yue2.SongRequest, options: dict | None) -> dict:
+    """Queue takes of ElevenLabs Music on the person's MCP server (`offer`, from eleven.offered): each take is one run
+    there, charged to their plan on that server."""
+    sid = eleven.server_of(offer["id"])
+    sent = eleven.prepare(req, sid, options, offer.get("fields"), influences.library(app.cfg.loras))
+    made = []
+    for seed in yue2.seeds(req):
+        take = app.store.create_take(pid, "eleven", {"seed": seed, "sent": sent, "request": req.model_dump()})
+        job = app.sched.submit("song.eleven", {"message": "Waiting its turn"}, pid, take["id"])
         take = app.store.update_take(take["id"], jobId=job["id"])
         app.hub.publish("take", take)
         made.append(take)

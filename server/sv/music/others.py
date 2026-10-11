@@ -34,16 +34,18 @@ def _sound(r: SongRequest) -> list[str]:
     return parts
 
 
-def ace_tags(r: SongRequest) -> str:
+def ace_tags(r: SongRequest, words: list[str] | None = None) -> str:
+    """`words`: influences it can't load, described (sv/influences.py's in_words)."""
     if r.style_override and r.style_override.strip():
         return " ".join(r.style_override.split())
-    parts = _sound(r)
+    parts = _sound(r) + list(words or [])
     parts.append(VOICE_TAGS.get(r.voice or "", "vocals") if r.sung else "instrumental")
     return ", ".join(dict.fromkeys(p for p in parts if p))
 
 
-def music3_caption(r: SongRequest) -> str:
-    """A caption the way Music 3 was taught: what it is, who sings, what plays, how it feels, tempo and key."""
+def music3_caption(r: SongRequest, words: list[str] | None = None) -> str:
+    """A caption the way Music 3 was taught: what it is, who sings, what plays, how it feels, tempo and key (and
+    `words`, influences it can't load, described)."""
     if r.style_override and r.style_override.strip():
         return " ".join(r.style_override.split())
     _sound(r)
@@ -57,6 +59,8 @@ def music3_caption(r: SongRequest) -> str:
         bits.append(f"Production: {r.extra.strip()}.")
     if r.tempo or r.key:
         bits.append(" ".join(x for x in [f"{r.tempo} BPM" if r.tempo else "", f"in {r.key}" if r.key else ""] if x) + ".")
+    if words:
+        bits.append("In the spirit of " + "; ".join(words) + ".")
     return " ".join(bits)
 
 
@@ -71,19 +75,16 @@ def prepare(model: str, r: SongRequest, library: dict[str, dict]) -> dict[str, A
     else:
         lyrics = "[Instrumental]"
     seconds = float(r.engine.seconds or LENGTH_SECONDS.get(r.length, 210.0))
-    influences: list[dict] = []
-    for c in r.influences:
-        rec = library.get(c.id)
-        if rec and model in rec.get("models", []) and c.strength > 0:
-            influences.append({"id": c.id, "name": rec["name"], "file": rec["file"], "strength": c.strength})
+    from ..influences import sort_out
+    influences, words = sort_out(r.influences, library, model)  # trained for it, or described in words
     if model == "ace15":
-        params = {"style": ace_tags(r), "lyrics": lyrics, "seconds": min(seconds, 600.0), "bpm": r.tempo or 120,
+        params = {"style": ace_tags(r, words), "lyrics": lyrics, "seconds": min(seconds, 600.0), "bpm": r.tempo or 120,
                   "key": r.key or "C major", "time_signature": r.time_signature or "4",
                   "language": LANGS.get(r.language.strip().lower(), "en"),
                   "temperature": round(0.85 * r.creativity, 3), "guidance": 2.0}
     else:
         g = r.engine.guidance
-        params = {"style": music3_caption(r), "lyrics": lyrics, "seconds": min(seconds, MUSIC3_MAX),
+        params = {"style": music3_caption(r, words), "lyrics": lyrics, "seconds": min(seconds, MUSIC3_MAX),
                   "guidance": g if g is not None and 1.0 <= g <= 4.0 else 1.7}
     return {"model": model, "style": params["style"], "lyrics": lyrics, "influences": influences, "params": params,
             "sung": r.sung, "plan": None, "sketch": None}

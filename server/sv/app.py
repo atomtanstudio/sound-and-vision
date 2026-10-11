@@ -34,7 +34,7 @@ from .comfy.registry import Registry
 from .config import load
 from .events import Hub
 from .jobs import JobError, Scheduler
-from .music import yue2
+from .music import eleven, yue2
 from .music.takes import run_other_take, run_yue2_take
 from . import covers as covers_mod, influence_engine, songs
 from . import imports as imports_mod
@@ -64,6 +64,7 @@ sched.register("analysis", "gpu", run_analysis)
 writers = Writers(cfg, store)
 writers.on_mcp = lambda: hub.publish("mcp", {})  # a server's catalog is in
 writers.comfy = comfy  # (which local image models there are)
+eleven.register(sched, writers.mcp)  # songs made with ElevenLabs Music on an MCP server
 
 
 class _App:  # what songs.start_takes needs from here
@@ -313,14 +314,15 @@ async def list_takes(pid: str) -> list[dict]:
 
 
 class MakeIn(yue2.SongRequest):
-    model: str = "yue2"
+    model: str = "yue2"  # or a song model on an MCP server ("mcp:<id>:music", ElevenLabs Music)
+    options: dict | None = None  # that model's own settings, as the song page offers them
 
 
 @app.post("/api/projects/{pid}/takes")
 async def make_takes(pid: str, body: MakeIn) -> dict:
     if not store.project(pid):
         raise _err(404, "That song isn't here any more.")
-    req = yue2.SongRequest(**body.model_dump(exclude={"model"}))
+    req = yue2.SongRequest(**body.model_dump(exclude={"model", "options"}))
     if req.cover:  # the song to cover is this song's reference: its file and length come from here, not the browser
         ref = (store.project(pid) or {}).get("reference") or {}
         if body.model != "yue2":
@@ -331,6 +333,11 @@ async def make_takes(pid: str, body: MakeIn) -> dict:
     try:
         if body.model in ("ace15", "music3"):
             made = songs.start_other_takes(APP, pid, body.model, req)
+        elif eleven.server_of(body.model):
+            offer = next((o for o in await eleven.offered(writers.mcp) if o["id"] == body.model), None)
+            if offer is None:
+                raise _err(409, "That song model's MCP server isn't connected: check it in Settings.")
+            made = songs.start_eleven_takes(APP, pid, offer, req, body.options)
         elif body.model == "yue2":
             made = songs.start_takes(APP, pid, req)
         else:
@@ -339,6 +346,12 @@ async def make_takes(pid: str, body: MakeIn) -> dict:
         return made
     except yue2.SongError as exc:
         raise _err(422, str(exc)) from None
+
+
+@app.get("/api/song-models")
+async def song_models() -> dict:
+    """The song models on the person's MCP servers (ElevenLabs Music), with their own settings."""
+    return {"mcp": await eleven.offered(writers.mcp)}
 
 
 class QuickIn(BaseModel):

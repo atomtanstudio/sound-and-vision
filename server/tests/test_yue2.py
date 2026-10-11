@@ -41,9 +41,10 @@ def test_sung_needs_words():
         yue2.prepare(SongRequest(genres=["pop"], lyrics="[Verse]\n"), LIB)
 
 
-def test_influences_are_checked_and_need_a_sketch():
-    with pytest.raises(SongError, match="doesn't work with YuE2"):
-        yue2.prepare(SongRequest(genres=["pop"], lyrics=LYRICS, influences=[{"id": "ace_only", "strength": .5}]), LIB)
+def test_influences_are_trained_in_or_described_and_need_a_sketch():
+    # one made for another model is described in the style instead (it can't be loaded into YuE2)
+    p = yue2.prepare(SongRequest(genres=["pop"], lyrics=LYRICS, influences=[{"id": "ace_only", "strength": .5}]), LIB)
+    assert p["influences"] == [] and LIB["ace_only"]["name"] in p["style"]
     with pytest.raises(SongError, match="sketch"):
         yue2.prepare(SongRequest(genres=["pop"], lyrics=LYRICS, plan="free",
                                  influences=[{"id": "sv_dreampop_v1", "strength": .5}]), LIB)

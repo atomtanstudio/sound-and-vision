@@ -58,7 +58,7 @@ function useJob(take: Take) {
   return take.jobId ? jobs[take.jobId] : undefined;
 }
 
-const MODEL_NAME: Record<string, string> = { yue2: "YuE2", ace15: "ACE-Step", music3: "Music 3", upload: "Your song" };
+const MODEL_NAME: Record<string, string> = { yue2: "YuE2", ace15: "ACE-Step", music3: "Music 3", eleven: "ElevenLabs", upload: "Your song" };
 
 function TakeCard({ take, title }: { take: Take; title: string }) {
   const job = useJob(take);
@@ -180,7 +180,13 @@ function TakeCard({ take, title }: { take: Take; title: string }) {
             {take.model === "yue2" && <><dt>Composition</dt><dd>{take.sent.plan === "free" ? "No sketch (improvised)" : take.sent.plan === "full" ? "Melody and chords" : "Melody only"}</dd></>}
             <dt>Influences</dt><dd>{take.sent.influences.length ? take.sent.influences.map((i) => `${i.name} ${Math.round(i.strength * 100)}%`).join(", ") : "None"}</dd>
             <dt>Seed</dt><dd className="tc-mono">{take.seed}</dd>
-            <dt>{take.model === "yue2" ? "Singing" : "Settings"}</dt><dd className="tc-mono">{Object.entries(take.sent.sing ?? take.sent.params ?? {}).filter(([k]) => !["style", "lyrics"].includes(k)).map(([k, v]) => `${k} ${v}`).join(" · ")}</dd>
+            {take.model === "eleven" && !!take.sent.params?.composition_plan && (
+              <><dt>Sections</dt><dd>{(take.sent.params.composition_plan as { sections: { section_name: string; duration_ms: number }[] })
+                .sections.map((x) => `${x.section_name} ${Math.round(x.duration_ms / 1000)} s`).join(" · ")}</dd></>
+            )}
+            <dt>{take.model === "yue2" ? "Singing" : "Settings"}</dt><dd className="tc-mono">{Object.entries(take.sent.sing ?? take.sent.params ?? {})
+              .filter(([k, v]) => !["style", "lyrics", "prompt", "composition_plan"].includes(k) && (v === null || typeof v !== "object"))
+              .map(([k, v]) => `${k} ${v}`).join(" · ")}</dd>
             {take.sent.sketch && <><dt>Sketch</dt><dd className="tc-mono">{Object.entries(take.sent.sketch).filter(([k]) => !["style", "lyrics"].includes(k)).map(([k, v]) => `${k} ${v}`).join(" · ") || "defaults"}</dd></>}
           </dl>
           <h4 className="tc-h4">Lyrics as sent</h4>

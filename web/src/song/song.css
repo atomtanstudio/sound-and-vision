@@ -285,6 +285,16 @@
   font: 600 11.5px var(--mono);
   color: var(--c-video);
 }
+.inf-words {
+  margin: 0;
+  max-width: 300px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.inf-words em {
+  color: var(--text);
+}
 .inf-pop {
   position: absolute;
   z-index: 5;

@@ -47,8 +47,11 @@ export interface SongDoc {
   masterTake?: string | null;
   /** A pasted description of the sound this song matches (kept for reference). */
   soundNotes?: string;
-  /** Who sings it: YuE2 (the default), ACE-Step 1.5 or MiniMax Music 3. */
+  /** Who sings it: YuE2 (the default), ACE-Step 1.5, MiniMax Music 3, or a song model on an MCP server
+   *  ("mcp:<id>:music": ElevenLabs Music). */
   model: SongModel;
+  /** That MCP song model's own settings, as the song page offers them (its audio quality, …). */
+  mcpOptions?: Record<string, string | number | boolean>;
   /** ACE-Step 1.5's time signature (beats in a bar). */
   timeSignature: "2" | "3" | "4" | "6" | null;
   /** MiniMax Music 3's guidance. */
@@ -57,7 +60,31 @@ export interface SongDoc {
   covering: { keep: "melody" | "full" } | null;
 }
 
-export type SongModel = "yue2" | "ace15" | "music3";
+export type SongModel = "yue2" | "ace15" | "music3" | `mcp:${string}`;
+
+/** A song model on one of the person's MCP servers (GET /api/song-models), with the settings it takes. */
+export interface McpSongModel {
+  id: `mcp:${string}`;
+  name: string; // "ElevenLabs Music"
+  via: string; // the server: "Mitte"
+  paid: boolean; // asked before each take
+  paidOnly?: boolean;
+  note: string;
+  maxSeconds: number;
+  fields: McpField[];
+}
+export interface McpField {
+  key: string;
+  label: string;
+  help: string;
+  type: "choice" | "switch" | "number";
+  default: string | number | boolean | null;
+  values?: (string | number)[];
+  labels?: Record<string, string>; // the values in plain words
+  min?: number;
+  max?: number;
+  integer?: boolean;
+}
 
 /** The song's sleeve: the picture made for it and the finished cover set from it (title, artist, logos). */
 export interface CoverPick {

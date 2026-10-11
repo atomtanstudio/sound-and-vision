@@ -47,6 +47,31 @@ def library(loras: Path) -> dict[str, dict]:
     return out
 
 
+def in_words(rec: dict) -> str:
+    """An influence's sound in words, for a song model it wasn't trained for: "Glitchcore: a dark, stuttering
+    electro-industrial track with chopped pitched vocals" (its name and the first sentence of what it's about)."""
+    about = " ".join(str(rec.get("about") or "").split())
+    about = re.split(r"(?<=[.!?])\s", about)[0].strip().rstrip(".,; ")
+    about = re.sub(r"^(turns|makes) (a|the|your|any) songs? into\s+", "", about, flags=re.I)
+    about = re.sub(r"[.,;]?\s*trained on\b.*$", "", about, flags=re.I).strip()
+    return f"{rec['name']}: {about[:160]}" if about else str(rec["name"])
+
+
+def sort_out(choices: list, library: dict[str, dict], model: str) -> tuple[list[dict], list[str]]:
+    """The influences picked for a song, for one model: those trained for it (loaded, at their strength), and the rest
+    described in words (for its style). One that's gone from the library is left out."""
+    trained, words = [], []
+    for c in choices:
+        rec = library.get(c.id)
+        if not rec or c.strength <= 0:
+            continue
+        if model in rec.get("models", []):
+            trained.append({"id": c.id, "name": rec["name"], "file": rec["file"], "strength": c.strength})
+        else:
+            words.append(in_words(rec))
+    return trained, words
+
+
 def listed(loras: Path, model: str | None = None) -> list[dict]:
     return [r for r in library(loras).values() if not r.get("hidden") and (model is None or model in r["models"])]
 

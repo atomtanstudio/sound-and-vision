@@ -155,15 +155,11 @@ def prepare(r: SongRequest, library: dict[str, dict]) -> dict[str, Any]:
             raise SongError("A sung song needs lyrics. Write some, or let the writer draft them.")
     else:
         lyrics = instrumental_lyrics(r.lyrics, r.length)
-    influences: list[dict] = []
-    for c in r.influences:
-        rec = library.get(c.id)
-        if not rec:
-            raise SongError(f"The influence '{c.id}' isn't in the library.")
-        if "yue2" not in rec.get("models", []):
-            raise SongError(f"'{rec['name']}' doesn't work with YuE2.")
-        if c.strength > 0:
-            influences.append({"id": c.id, "name": rec["name"], "file": rec["file"], "strength": c.strength})
+    from ..influences import sort_out
+    # those trained for YuE2 are loaded; any other (one made for another model) is described in the style
+    influences, words = sort_out(r.influences, library, "yue2")
+    if words and not (r.style_override and r.style_override.strip()):
+        style = ", ".join([style, *words])
     if not r.sung:
         influences.append({"id": "instrumental", "name": "Instrumental", "file": INSTRUMENTAL_INFLUENCE, "strength": 1.0})
     # an influence trained with a trigger word hears it at the start of every caption: the style leads with it too

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, fileUrl } from "../lib/api";
-import type { Influence, Project } from "../lib/types";
+import type { Influence, McpField, McpSongModel, Project } from "../lib/types";
 import type { Listed } from "../shell/RecentList";
 import "../shell/bring.css";
 import { lyricsText, useSong } from "../state/song";
@@ -39,9 +39,53 @@ const MODELS = {
 } as const;
 const LENGTH_HINT = { short: "about 1½–2½ min", song: "about 3–4 min", long: "up to 6 min" } as const;
 
+/** A song model's own settings on its MCP server, as it lists them: a choice, a switch or a number, each starting at
+ *  its default. Kept with the song (mcpOptions). */
+function McpFields({ model }: { model: McpSongModel }) {
+  const s = useSong();
+  const opts = s.doc.mcpOptions ?? {};
+  const set = (f: McpField, v: string | number | boolean | null) => {
+    const next = { ...opts };
+    if (v === null || v === f.default) delete next[f.key];
+    else next[f.key] = v;
+    s.set("mcpOptions", next);
+  };
+  return (
+    <div className="mk-pair">
+      {model.fields.map((f) => {
+        const v = opts[f.key] ?? f.default;
+        return (
+          <div className="mk-field" key={f.key} title={f.help || undefined}>
+            <label className="mk-label" htmlFor={`mcp-${f.key}`}>{f.label}</label>
+            {f.type === "choice" ? (
+              <select id={`mcp-${f.key}`} className="in" value={String(v ?? "")}
+                onChange={(e) => set(f, f.values?.find((x) => String(x) === e.target.value) ?? null)}>
+                {(f.values ?? []).map((x) => <option key={String(x)} value={String(x)}>{f.labels?.[String(x)] ?? String(x)}{x === f.default ? " (default)" : ""}</option>)}
+              </select>
+            ) : f.type === "switch" ? (
+              <Segmented size="sm" label={f.label} value={v ? "on" : "off"} onChange={(x) => set(f, x === "on")}
+                options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]} />
+            ) : (
+              <input id={`mcp-${f.key}`} className="in mk-num" type="number" min={f.min} max={f.max} step={f.integer ? 1 : "any"}
+                value={v === null || v === undefined ? "" : String(v)}
+                onChange={(e) => set(f, e.target.value === "" ? null : Math.max(f.min ?? -Infinity, Math.min(f.max ?? Infinity, Number(e.target.value))))} />
+            )}
+            {f.help && <span className="mk-help">{f.help}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function MakePanel() {
   const s = useSong();
   const d = s.doc;
+  // song models on the person's MCP servers (ElevenLabs Music on Mitte), with their own settings
+  const [mcpModels, setMcpModels] = useState<McpSongModel[]>([]);
+  useEffect(() => {
+    void api.get<{ mcp: McpSongModel[] }>("/api/song-models").then((r) => setMcpModels(r.mcp)).catch(() => undefined);
+  }, []);
   const [moreGenres, setMoreGenres] = useState(false);
   const [custom, setCustom] = useState("");
   const [picking, setPicking] = useState(false);
@@ -57,13 +101,18 @@ export function MakePanel() {
   const why = !hasSound ? "Choose how it should sound first" : d.sung && words < 4 ? "A sung song needs words" :
     covering && !s.project?.reference ? "Choose the song to cover" : null;
   const lib = Object.fromEntries(s.library.map((i) => [i.id, i]));
-  const model = d.model ?? "yue2";
+  const mcp = mcpModels.find((m) => m.id === d.model);
+  // (a chosen MCP model that's gone, a server removed or signed out: back to YuE2)
+  const model = mcp ? mcp.id : d.model in MODELS ? (d.model as keyof typeof MODELS) : "yue2";
+  const local = mcp ? null : MODELS[model as keyof typeof MODELS];
   const scale = { short: 0.6, song: 1, long: 1.6 }[d.length] ?? 1;
-  const minutes = Math.max(1, Math.round((d.takes * MODELS[model].perTake * scale) / 60));
+  const minutes = Math.max(1, Math.round((d.takes * (local?.perTake ?? 90) * scale) / 60));
   const yue = model === "yue2";
+  const modelName = mcp ? `${mcp.name} (${mcp.via})` : local!.name;
 
   async function make() {
     if (!s.project) return;
+    if (mcp?.paid && !window.confirm(`${mcp.name} on ${mcp.via} may charge your account for ${d.takes === 1 ? "this take" : `these ${d.takes} takes`}. Go ahead?`)) return;
     setMaking(true);
     setError(null);
     await s.saveNow();
@@ -76,6 +125,7 @@ export function MakePanel() {
         lyrics: lyricsText(d.sections), length: d.length, influences: d.influences, takes: d.takes, plan: d.plan,
         creativity: d.creativity, repetition: d.repetition, seed: d.seed, engine,
         cover: covering ? { keep: d.covering!.keep } : null,
+        options: mcp ? d.mcpOptions ?? {} : null,
       });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
@@ -169,7 +219,8 @@ export function MakePanel() {
               const inf = lib[pick.id];
               return (
                 <InfluenceChip key={pick.id} name={inf?.name ?? pick.id} kind={inf?.kind ?? "Style"} strength={pick.strength}
-                  max={inf?.max ?? 1} recommended={inf?.recommended ?? 0.5}
+                  max={inf?.max ?? 1} recommended={inf?.recommended ?? 0.5} model={modelName}
+                  words={inf && !inf.models.includes(mcp ? "eleven" : model) ? inWords(inf) : undefined}
                   onChange={(v) => s.set("influences", d.influences.map((x) => (x.id === pick.id ? { ...x, strength: v } : x)))}
                   onRemove={() => s.set("influences", d.influences.filter((x) => x.id !== pick.id))} />
               );
@@ -188,12 +239,14 @@ export function MakePanel() {
         <div className="mk-step-head">
           <h3><span className="mk-n">4</span>Who sings it</h3>
         </div>
-        <Segmented size="sm" label="Song model" value={model} onChange={(v) => s.set("model", v)}
-          options={(Object.keys(MODELS) as (keyof typeof MODELS)[]).map((k) => ({ value: k, label: MODELS[k].name, hint: MODELS[k].hint }))} />
+        <Segmented size="sm" label="Song model" value={model as string} onChange={(v) => s.set("model", v as typeof d.model)}
+          options={[...(Object.keys(MODELS) as (keyof typeof MODELS)[]).map((k) => ({ value: k as string, label: MODELS[k].name, hint: MODELS[k].hint })),
+            ...mcpModels.map((m) => ({ value: m.id as string, label: `${m.name} (${m.via})`, hint: m.note }))]} />
         <p className="mk-help">
-          {model === "yue2" && "YuE2 sounds the cleanest and follows your words closely; it sketches the melody first, and takes your influences."}
-          {model === "ace15" && "ACE-Step 1.5 is the fastest and has real controls for tempo, key and time signature. YuE2 influences don't apply to it."}
-          {model === "music3" && "MiniMax Music 3 builds rich, varied arrangements and decides its own length (up to the one you choose). It's the slowest. YuE2 influences don't apply."}
+          {model === "yue2" && "YuE2 sounds the cleanest and follows your words closely; it sketches the melody first, and has learned your influences."}
+          {model === "ace15" && "ACE-Step 1.5 is the fastest and has real controls for tempo, key and time signature. Influences it hasn't learned are described to it in words."}
+          {model === "music3" && "MiniMax Music 3 builds rich, varied arrangements and decides its own length (up to the one you choose). It's the slowest. Influences it hasn't learned are described to it in words."}
+          {mcp && `${mcp.name} runs on your ${mcp.via} account, not this machine: it sings your words section by section, at the length you choose (up to ${Math.round(mcp.maxSeconds / 60)} minutes). Each take is one run there, charged to your plan${mcp.paid ? ", and you're asked first" : ""}. Your influences are described to it in words.`}
         </p>
         {model === "yue2" && (
           <div className="mk-field">
@@ -231,12 +284,13 @@ export function MakePanel() {
               options={(["4", "3", "6", "2"] as const).map((v) => ({ value: v, label: `${v}/4`.replace("6/4", "6/8") }))} />
           </div>
         )}
+        {mcp && mcp.fields.length > 0 && <McpFields model={mcp} />}
         {model === "music3" && (
           <Slider label="Guidance" value={d.music3Guidance ?? 1.7} min={1.0} max={4.0} step={0.1} defaultValue={1.7}
             left="Freer" right="Follows the caption" format={(v) => v.toFixed(1)} onChange={(v) => s.set("music3Guidance", v)} />
         )}
-        <Slider label="Creativity" value={d.creativity} min={0.6} max={1.4} step={0.05} defaultValue={1.0}
-          left="Steady" right="Adventurous" format={(v) => v.toFixed(2)} onChange={(v) => s.set("creativity", v)} />
+        {!mcp && <Slider label="Creativity" value={d.creativity} min={0.6} max={1.4} step={0.05} defaultValue={1.0}
+          left="Steady" right="Adventurous" format={(v) => v.toFixed(2)} onChange={(v) => s.set("creativity", v)} />}
         {yue && <Slider label="Variety" value={d.repetition} min={1.0} max={1.4} step={0.01} defaultValue={1.2}
           left="Repeats itself more" right="Repeats less" format={(v) => v.toFixed(2)} onChange={(v) => s.set("repetition", v)} />}
         <div className="mk-pair">
@@ -284,7 +338,7 @@ export function MakePanel() {
         <Button kind="primary" size="lg" busy={making} disabled={!!why || making} onClick={make} title={why ?? undefined}>
           {why ?? `Make ${d.takes === 1 ? "a take" : `${d.takes} takes`}`}
         </Button>
-        <span className="mk-go-hint">{MODELS[model].name} · about {minutes} min{yue && d.influences.length ? ` · ${d.influences.length} influence${d.influences.length > 1 ? "s" : ""}` : ""}</span>
+        <span className="mk-go-hint">{modelName} · about {minutes} min{d.influences.length ? ` · ${d.influences.length} influence${d.influences.length > 1 ? "s" : ""}` : ""}</span>
       </div>
 
       {matching && <MatchSound initial={matching.text} fromIdea={matching.fromIdea} onClose={() => setMatching(null)} />}
@@ -396,17 +450,32 @@ function CoverSource() {
   );
 }
 
-function InfluenceChip(props: { name: string; kind: string; strength: number; max: number; recommended: number; onChange: (v: number) => void; onRemove: () => void }) {
+/** An influence's sound in words, for a model that hasn't learned it (as the server says it: sv/influences.py). */
+function inWords(i: Influence): string {
+  let a = (i.about || "").split(/(?<=[.!?])\s/)[0].trim().replace(/[.,; ]+$/, "");
+  a = a.replace(/^(turns|makes) (a|the|your|any) songs? into\s+/i, "").replace(/[.,;]?\s*trained on\b.*$/i, "").trim();
+  return a ? `${i.name}: ${a}` : i.name;
+}
+
+/** A picked influence: learned by the model (its strength, set here), or described to it in words (`words`). */
+function InfluenceChip(props: { name: string; kind: string; strength: number; max: number; recommended: number; model: string;
+  words?: string; onChange: (v: number) => void; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <span className="inf-chip">
       <Chip on tone="var(--c-video)" onClick={() => setOpen(!open)} onRemove={props.onRemove}>
-        <span className="inf-kind">{props.kind}</span> {props.name} <span className="inf-amt">{Math.round(props.strength * 100)}%</span>
+        <span className="inf-kind">{props.kind}</span> {props.name}{" "}
+        <span className="inf-amt">{props.words ? "in words" : `${Math.round(props.strength * 100)}%`}</span>
       </Chip>
       {open && (
         <div className="inf-pop">
-          <Slider label="Strength" value={props.strength} min={0.05} max={props.max} step={0.05} defaultValue={props.recommended}
-            left="A hint" right="Strong" format={(v) => `${Math.round(v * 100)}%`} onChange={props.onChange} />
+          {props.words ? (
+            <p className="inf-words">{props.model} hasn't learned this one, so it's described in the song's style instead:
+              {" "}<em>“{props.words}”</em></p>
+          ) : (
+            <Slider label="Strength" value={props.strength} min={0.05} max={props.max} step={0.05} defaultValue={props.recommended}
+              left="A hint" right="Strong" format={(v) => `${Math.round(v * 100)}%`} onChange={props.onChange} />
+          )}
         </div>
       )}
     </span>
@@ -418,7 +487,8 @@ function InfluencePicker({ library, picked, onPick, onClose }: { library: Influe
   const shown = library.filter((i) => !picked.includes(i.id) && `${i.name} ${i.kind} ${i.about}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <Modal title="Add an influence" onClose={onClose}>
-      <p className="ip-lead">Influences are trained styles, genres or artists that YuE2 leans toward. Add one, then set how strongly it pulls.</p>
+      <p className="ip-lead">Influences are sounds learned from songs you chose (in the Influence Engine). YuE2 leans toward them,
+        as strongly as you set; a model that hasn't learned one gets it described in words.</p>
       <input className="in" autoFocus placeholder="Search influences" value={q} onChange={(e) => setQ(e.target.value)} />
       <ul className="ip-list">
         {shown.map((i) => (
@@ -436,7 +506,7 @@ function InfluencePicker({ library, picked, onPick, onClose }: { library: Influe
       <details className="ip-own">
         <summary>
           <strong>Add your own</strong>
-          <span>A LoRA you trained, or one from Hugging Face</span>
+          <span>An influence trained elsewhere (a LoRA file), or one from Hugging Face</span>
         </summary>
         <AddInfluence onAdded={async (i) => {
           const lib = await useSong.getState().refreshLibrary();
