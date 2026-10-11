@@ -25,6 +25,7 @@ import httpx
 from PIL import Image
 
 from . import look as look_mod, net
+from .catalog import choice_words, summary
 from .config import ROOT
 from .paths import under
 from .jobs import Context, JobError, Scheduler
@@ -117,12 +118,14 @@ class Covers:
                 # (2026-10-09), unless they pick the local one or none
                 "auto": s.get("auto") if s.get("auto") in (*ids, "off") else self.writers.picture_by("covers"),
                 "choices": choices, "scenes": self.writers.picture_by("scenes"),  # (for the music video form)
-                "motion": self.writers.motion_by(), "motionChoices": self.writers.motion_choices()}
+                "motion": self.writers.motion_by(), "motionChoices": self.writers.motion_choices(),
+                # the model and settings chosen on an MCP server, for the "may charge your account" question
+                "using": {role: self.writers.using(role) for role in ("covers", "scenes", "motion")}}
 
     def set_settings(self, engine: str | None = None, artist: str | None = None, auto: str | None = None) -> dict:
         s = self.app.store.setting("covers") or {}
         ids = self.writers.image_ids()
-        if engine in ids:
+        if engine in ids and engine != self.writers.picture_by("covers"):  # (the same one keeps its model and settings)
             self.writers.set_who("covers", [{"provider": engine}])
         if auto in (*ids, "off"):
             s["auto"] = auto
@@ -284,11 +287,15 @@ class Covers:
         server = self.writers.mcp.get(sid)
         if server is None:
             raise JobError("That MCP server isn't in Settings any more: choose another for album covers.")
+        step = self.writers.step("covers")  # the model and settings chosen there, when covers use this server
+        step = step if step.get("provider") == f"mcp:{sid}" else {}
         ctx.update(stage="paint", message=f"{server['name']} is painting it", progress=0.3)
-        url = await make_picture_with(self.writers, server, prompt + STYLE_TAIL, "1:1")
+        url = await make_picture_with(self.writers, server, prompt + STYLE_TAIL, "1:1",
+                                      choice_words(self.writers.catalogs, sid, "image", step))
         ctx.update(stage="fetch", message="Fetching the picture", progress=0.8)
         await fetch_picture(url, dest)
-        return {"engine": f"mcp:{sid}", "model": server["name"], "source": url}
+        made = summary(self.writers.catalogs, sid, "image", step)
+        return {"engine": f"mcp:{sid}", "model": f"{server['name']}: {made}" if made else server["name"], "source": url}
 
     async def _openai(self, ctx: Context, prompt: str, dest: Path) -> dict:
         """ChatGPT's own image tool, under the user's ChatGPT plan (Sign in with ChatGPT, in Settings)."""
@@ -391,26 +398,31 @@ PICTURE_ASK = """Make exactly one picture with the tools of the MCP server "{nam
 <<<
 {prompt}
 >>>
-- Use the tool that makes a picture from a text prompt. If it starts a job rather than returning the picture, follow
+{use}- Use the tool that makes a picture from a text prompt. If it starts a job rather than returning the picture, follow
   the job with the server's other tools until the picture is ready. Make one picture only, even if something seems
   slow or fails; never start a second one.
 - If the server has no tools, or none that makes pictures, call nothing and answer with status "unavailable".
 Answer with {{"status": "done", "url": "<the picture's https address>", "error": ""}}, or
 {{"status": "error", "url": "", "error": "what went wrong"}}. If the picture came back only inside the tool's answer
 (not as an address), say so in the error."""
+USE = """- Make it with {choice}. The person chose these in Settings to control what it costs: use no other model and
+  no other values for these settings (leave the rest at the server's defaults).
+"""
 PICTURE_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["status", "url", "error"],
                   "properties": {"status": {"type": "string", "enum": ["done", "error", "unavailable"]},
                                  "url": {"type": "string"}, "error": {"type": "string"}}}
 SHAPE_WORDS = {"1:1": "square", "16:9": "16:9 landscape", "9:16": "9:16 portrait", "4:5": "4:5 portrait", "3:2": "3:2 landscape"}
 
 
-async def make_picture_with(writers: Writers, server: dict, prompt: str, shape: str) -> str:
-    """A picture from one of the person's MCP servers, made by Claude with that server's tools: its address."""
+async def make_picture_with(writers: Writers, server: dict, prompt: str, shape: str, choice: str = "") -> str:
+    """A picture from one of the person's MCP servers, made by Claude with that server's tools: its address. `choice`:
+    the model and settings the person chose for it (sv/catalog.py's choice_words; "" for the server's default)."""
     step = (writers.who().get("chores") or [{}])[0]  # the small-chores model, when it's a Claude one
     try:
         r = await writers.providers["claude"].complete(
             "You make one picture for an app with the MCP tools you are given, exactly as asked, and answer only with the "
-            "JSON asked for.", PICTURE_ASK.format(name=server["name"], shape=SHAPE_WORDS.get(shape, shape), prompt=prompt),
+            "JSON asked for.", PICTURE_ASK.format(name=server["name"], shape=SHAPE_WORDS.get(shape, shape), prompt=prompt,
+                                                 use=USE.format(choice=choice) if choice else ""),
             PICTURE_SCHEMA, step.get("model") if step.get("provider") == "claude" else None,
             timeout=600, tools=writers.mcp.allowed([server["id"]]), turns=60, mcp=await writers.mcp.claude_config([server["id"]]))
     except WriterError as exc:

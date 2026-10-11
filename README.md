@@ -49,7 +49,9 @@ run, just before they were built into the app.
   what in Settings; the interface names a model only once you've connected it. Videos made in code need a director that
   can write and run code: today that's Claude Code.
 - **MCP servers.** Add your own (streamable HTTP, with a key or their OAuth sign-in) in Settings. Your director model
-  can use them while it works, and they can make pictures or animate scenes. Servers marked paid ask before each job.
+  can use them while it works, and they can make pictures or animate scenes. The app reads each server's catalog of
+  models (it only looks things up, so nothing is spent), so for covers, pictures and clips you can choose the model and
+  its settings, such as resolution and clip length, to keep the cost down. Servers marked paid ask before each job.
 
 ## Set it up, step by step
 

@@ -5,7 +5,7 @@ import { Button, Modal } from "../ui/controls";
 import "./settings.css";
 import { Machine, machine } from "../lib/machine";
 
-type Step = { provider: string; model: string | null; effort?: string | null };
+type Step = { provider: string; model: string | null; effort?: string | null; options?: Record<string, string> };
 
 interface Connections {
   providers: ProviderStatus[];
@@ -34,6 +34,22 @@ interface McpServer {
   signIn?: boolean; // signs in in the browser (MCP's OAuth) rather than with a key
   signedIn?: boolean;
   needsSignIn?: boolean;
+  catalog?: Catalog; // the models it runs, once they've been read
+}
+
+/** A server's models, read by Claude from its own tools (sv/catalog.py): picture models and clip (video) models, each
+ *  with the settings that change what it makes and what it costs. */
+interface Catalog {
+  state: "none" | "reading" | "ready" | "error";
+  error?: string;
+  image?: CatalogModel[];
+  video?: CatalogModel[];
+}
+interface CatalogModel {
+  id: string;
+  name: string;
+  note: string;
+  options: { key: string; label: string; values: string[]; default: string }[];
 }
 
 /** Sign in to a server in a new tab; it comes back to the app by itself, or its address is pasted here. */
@@ -105,8 +121,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("message", back);
   }, []);
 
-  // While a sign-in code is showing, look every few seconds for the approval.
-  const waiting = c?.providers.some((p) => p.login);
+  // While a sign-in code is showing, or a server's models are being read, look every few seconds.
+  const waiting = c?.providers.some((p) => p.login) || c?.mcp?.some((m) => m.catalog?.state === "reading");
   useEffect(() => {
     if (!waiting) return;
     const id = window.setInterval(load, 3000);
@@ -150,10 +166,20 @@ export function Settings({ onClose }: { onClose: () => void }) {
     setC({ ...c, who });
   }
 
-  async function setPictures(role: string, provider: string) {
+  async function setPictures(role: string, step: { provider: string; model?: string | null; options?: Record<string, string> }) {
     if (!c) return;
-    const who = await api.put<Connections["who"]>(`/api/connections/who/${role}`, [{ provider }]);
+    const who = await api.put<Connections["who"]>(`/api/connections/who/${role}`, [step]);
     setC({ ...c, who });
+  }
+
+  async function readModels(id: string) {
+    setError(null);
+    try {
+      await api.post(`/api/mcp/${id}/catalog`);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    }
   }
 
   return (
@@ -235,18 +261,12 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 {[...Object.entries(c.imageRoles).map(([role, label]) => [role, label, c.imageProviders!] as const),
                   ...Object.entries(c.motionRoles ?? {}).map(([role, label]) => [role, label, c.motionProviders ?? []] as const)]
                   .map(([role, label, choices]) => {
-                    const now = c.who[role]?.[0]?.provider ?? "local";
-                    const chosen = choices.find((x) => x.id === now);
+                    const step = c.who[role]?.[0] ?? { provider: "local", model: null };
+                    const server = step.provider.startsWith("mcp:") ? c.mcp?.find((m) => `mcp:${m.id}` === step.provider) : undefined;
                     return (
-                      <div key={role} className="st-role">
-                        <span>{label}</span>
-                        <select className="in" value={now} onChange={(e) => void setPictures(role, e.target.value)}>
-                          {choices.map((x) => (
-                            <option key={x.id} value={x.id}>{x.name}{x.connected === false ? " (not connected)" : ""}</option>
-                          ))}
-                        </select>
-                        <em>{chosen?.note}</em>
-                      </div>
+                      <MediaRow key={role} label={label} choices={choices} step={step} server={server}
+                        kind={role in (c.motionRoles ?? {}) ? "video" : "image"}
+                        onSet={(next) => void setPictures(role, next)} onRead={(id) => void readModels(id)} />
                     );
                   })}
               </div>
@@ -271,6 +291,93 @@ function filmOptions(c: Connections): Option[] {
   const claude = c.providers.find((p) => p.id === "claude");
   return Object.entries(c.filmModels ?? {}).map(([id, name]) => ({ key: `claude:${id}`, p: "claude", m: id, ok: !!claude?.connected,
     label: `Claude ${name}` }));
+}
+
+/** One picture or clip job in Settings: who makes it and, on an MCP server, which of its models and with what settings
+ *  (from the server's catalog; read it first if it hasn't been). */
+function MediaRow({ label, choices, step, server, kind, onSet, onRead }: {
+  label: string;
+  choices: ImageProvider[];
+  step: Step;
+  server?: McpServer;
+  kind: "image" | "video";
+  onSet: (step: { provider: string; model?: string | null; options?: Record<string, string> }) => void;
+  onRead: (id: string) => void;
+}) {
+  const chosen = choices.find((x) => x.id === step.provider);
+  const cat = server?.catalog;
+  const models = cat?.[kind] ?? [];
+  const model = models.find((x) => x.id === step.model);
+  const options = step.options ?? {};
+  const what = kind === "video" ? "clip" : "picture";
+  let middle = null;
+  let note = chosen?.note;
+  if (server && (!cat || cat.state === "none" || (cat.state === "error" && !models.length))) {
+    middle = <Button size="sm" kind="ghost" onClick={() => onRead(server.id)}>Read its models</Button>;
+    note = cat?.state === "error" ? cat.error : `Lists the ${what} models ${server.name} runs, with their settings, so you can choose one. Nothing is made.`;
+  } else if (server && cat?.state === "reading") {
+    middle = <span className="st-wait">Reading its models…</span>;
+  } else if (server && !models.length) {
+    middle = <span className="st-wait">It lists no {what} models</span>;
+  } else if (server) {
+    middle = (
+      <select className="in" value={step.model ?? ""} aria-label={`${label}: model`}
+        onChange={(e) => onSet({ provider: step.provider, model: e.target.value || null })}>
+        <option value="">Its default model</option>
+        {models.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        {step.model && !model && <option value={step.model}>{step.model} (no longer listed)</option>}
+      </select>
+    );
+    note = model?.note || note;
+  }
+  return (
+    <>
+      <div className="st-role">
+        <span>{label}</span>
+        <select className="in" value={step.provider} onChange={(e) => onSet({ provider: e.target.value })}>
+          {choices.map((x) => (
+            <option key={x.id} value={x.id}>{x.name}{x.connected === false ? " (not connected)" : ""}</option>
+          ))}
+        </select>
+        {middle ?? <span />}
+        <em>{note}</em>
+      </div>
+      {model && model.options.length > 0 && (
+        <div className="st-media-opts">
+          {model.options.map((o) => (
+            <label key={o.key} className="st-field">
+              {o.label}
+              <select className="in" value={options[o.key] ?? ""}
+                onChange={(e) => {
+                  const next = { ...options };
+                  if (e.target.value) next[o.key] = e.target.value;
+                  else delete next[o.key];
+                  onSet({ provider: step.provider, model: model.id, options: next });
+                }}>
+                <option value="">{o.default ? `Its default (${o.default})` : "Its default"}</option>
+                {o.values.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** On a server's card: what its catalog holds, and reading it (again). */
+function CatalogLine({ m, onRead }: { m: McpServer; onRead: () => void }) {
+  const cat = m.catalog;
+  if (cat?.state === "reading") return <p className="st-note">Reading its models…</p>;
+  const n = (k: "image" | "video") => cat?.[k]?.length ?? 0;
+  const have = cat?.state === "ready" || n("image") + n("video") > 0;
+  return (
+    <p className="st-note">
+      {have ? `${n("image")} picture model${n("image") === 1 ? "" : "s"}, ${n("video")} video model${n("video") === 1 ? "" : "s"}. ` : ""}
+      {cat?.state === "error" && <span className="st-bad">{cat.error} </span>}
+      <button type="button" className="st-out" onClick={onRead}>{have ? "Read them again" : "Read its models"}</button>
+    </p>
+  );
 }
 
 function RoleRow({ label, chain, options, efforts, providers, onPick, onEffort }: {
@@ -385,6 +492,7 @@ function McpRow({ server: m, onChange }: { server: McpServer; onChange: () => vo
           </Button>
         )
       )}
+      {m.ok && <CatalogLine m={m} onRead={() => void act("catalog", () => api.post(`/api/mcp/${m.id}/catalog`))} />}
       {m.ok && (m.tools?.length ?? 0) > 0 && (
         <button type="button" className="st-out" onClick={() => setOpen(!open)} aria-expanded={open}>
           {open ? "Hide its tools" : "Show its tools"}

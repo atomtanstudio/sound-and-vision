@@ -8,12 +8,15 @@ Motion Graphics film, a music video); only Claude does it.
 Pictures have roles too (IMAGE_ROLES): album covers, and the pictures for music videos. Each is one choice of
 image_ids(): ChatGPT's own image tool (under their ChatGPT plan), Krea 2 on the local GPU, or one of the person's own
 MCP servers ("mcp:<id>", which Claude uses to make the picture). An install can also turn on the owner's Mitte
-(SV_MITTE=1: GPT Image 2.5, driven by Claude through the Mitte connector on their Claude account)."""
+(SV_MITTE=1: GPT Image 2.5, driven by Claude through the Mitte connector on their Claude account). A step that names an
+MCP server can also carry the model to use there and its settings ({"model", "options"}), from the server's catalog
+(sv/catalog.py); without them the server uses its own default."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from ..catalog import Catalogs, clean_choice, summary
 from ..config import Config
 from ..mcp import Servers
 from ..store import Store
@@ -55,6 +58,8 @@ class Writers:
         }
         self.machine, self.mitte = cfg.machine, cfg.mitte
         self.mcp = Servers(cfg.data / "secrets" / "mcp.json")
+        self.catalogs = Catalogs(cfg.data / "mcp-catalogs")
+        self.on_mcp = None  # called when a catalog has been read (the app tells the interface)
 
     def who(self) -> dict[str, list[dict]]:
         # settings saved before 2026-10-09 put Grok first; the user asked for no Grok for now, so those are dropped
@@ -105,10 +110,11 @@ class Writers:
 
     def set_who(self, role: str, chain: list[dict]) -> None:
         cur = self.store.setting("who") or {}
-        if role in IMAGE_ROLES:
-            cur[role] = [{"provider": c["provider"]} for c in chain if c.get("provider") in self.image_ids()][:1]
-        elif role in MOTION_ROLES:
-            cur[role] = [{"provider": c["provider"]} for c in chain if c.get("provider") in self.motion_ids()][:1]
+        if role in IMAGE_ROLES or role in MOTION_ROLES:
+            ids = self.image_ids() if role in IMAGE_ROLES else self.motion_ids()
+            cur[role] = [{"provider": c["provider"],
+                          **(clean_choice(c.get("model"), c.get("options")) if c["provider"].startswith("mcp:") else {})}
+                         for c in chain if c.get("provider") in ids][:1]
         elif role in DEFAULT_WHO:
             cur[role] = [{"provider": c["provider"], "model": c.get("model"),
                           **({"effort": str(c["effort"])[:20]} if c.get("effort") and (
@@ -117,6 +123,35 @@ class Writers:
         else:
             return
         self.store.set_setting("who", cur)
+
+    def step(self, role: str) -> dict:
+        """The first choice for a role: {provider, model?, options?, effort?}."""
+        return (self.who().get(role) or [{}])[0]
+
+    def using(self, role: str) -> str:
+        """For a picture or clip role on an MCP server, the model and settings chosen there, short ("" for its default)."""
+        step = self.step(role)
+        provider = str(step.get("provider") or "")
+        if not provider.startswith("mcp:"):
+            return ""
+        return summary(self.catalogs, provider.removeprefix("mcp:"), "video" if role in MOTION_ROLES else "image", step)
+
+    async def read_models_once(self, sid: str) -> None:
+        """A server that answers gets its catalog read by itself, once (when it's added, signed in to or checked), if
+        Claude, which reads it, is connected. After that it's read again only when the person asks."""
+        rec = self.mcp.get(sid)
+        if not rec or not rec.get("ok") or self.catalogs.public(sid)["state"] != "none":
+            return
+        try:
+            if not (await self.providers["claude"].status()).get("connected"):
+                return
+        except Exception:  # noqa: BLE001 (no Claude, no reading: the person can still ask for it)
+            return
+        self.catalogs.start(self, sid)
+
+    def mcp_listed(self) -> list[dict]:
+        """The MCP servers for the interface, each with its catalog (sv/catalog.py)."""
+        return [s | {"catalog": self.catalogs.public(s["id"])} for s in self.mcp.listed()]
 
     def image_choices(self, statuses: dict[str, dict] | None = None) -> list[dict]:
         """What can make pictures: {id, name, note, cost (USD a picture, None if unknown), paid, connected}. Without
@@ -145,7 +180,7 @@ class Writers:
         statuses = {k: await p.status() for k, p in self.providers.items()}
         return {"providers": list(statuses.values()), "who": self.who(), "roles": ROLE_LABELS, "efforts": list(EFFORTS),
                 "filmModels": FILM_MODELS, "imageRoles": IMAGE_ROLES, "imageProviders": self.image_choices(statuses),
-                "motionRoles": MOTION_ROLES, "motionProviders": self.motion_choices(statuses), "mcp": self.mcp.listed()}
+                "motionRoles": MOTION_ROLES, "motionProviders": self.motion_choices(statuses), "mcp": self.mcp_listed()}
 
     async def doers(self) -> dict[str, Any]:
         """Who does each job right now, for the interface's wording: the first connected step of each role's chain

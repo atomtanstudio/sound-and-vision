@@ -6,7 +6,7 @@ import { useSong } from "../state/song";
 import { usePlayer } from "../state/player";
 import { Button, Disclosure, Segmented, TextArea } from "../ui/controls";
 import { machine } from "../lib/machine";
-import { choiceLabel, okToSpend, type PictureChoice } from "../lib/pictures";
+import { choiceLabel, okToSpend, type PictureChoice, type Using } from "../lib/pictures";
 import { Doer, doer, useWho } from "../state/who";
 
 const LETTER = { a: "A", b: "B", c: "C", d: "D" } as Record<string, string>;
@@ -358,14 +358,16 @@ function PictureStep({ project, chosen, job, busy, act, onChange, onCancel }: {
   const [exact, setExact] = useState(false);
   const [engine, setEngine] = useState("local");
   const [choices, setChoices] = useState<PictureChoice[]>([]);
+  const [defaults, setDefaults] = useState({ engine: "", using: "" }); // the covers' choice in Settings, and its model
   const fileRef = useRef<HTMLInputElement>(null);
   const cover = project.cover;
   const earlier = (project.covers ?? []).filter((c) => c.n !== cover?.n).slice(-6).reverse();
   const madeBy = !cover ? "" : cover.made.engine === "upload" ? "your picture" : cover.made.model;
 
   useEffect(() => {
-    void api.get<{ engine: string; choices: PictureChoice[] }>("/api/covers/settings")
-      .then((s) => { setEngine(s.engine); setChoices(s.choices); }).catch(() => undefined);
+    void api.get<{ engine: string; choices: PictureChoice[]; using?: Using }>("/api/covers/settings")
+      .then((s) => { setEngine(s.engine); setChoices(s.choices); setDefaults({ engine: s.engine, using: s.using?.covers ?? "" }); })
+      .catch(() => undefined);
   }, []);
 
   if (chosen && cover) {
@@ -380,7 +382,7 @@ function PictureStep({ project, chosen, job, busy, act, onChange, onCancel }: {
       </div>
     );
   }
-  const make = () => okToSpend(choices.find((c) => c.id === engine)) && act("picture", () => api.post(`/api/projects/${project.id}/cover`, how === "moving"
+  const make = () => okToSpend(choices.find((c) => c.id === engine), "this picture", engine === defaults.engine ? defaults.using : "") && act("picture", () => api.post(`/api/projects/${project.id}/cover`, how === "moving"
     ? { engine, note: steer, moving: true, forLiving: true }
     : exact ? { engine, prompt: words, forLiving: true } : { engine, note: words, moving: true, forLiving: true }));
   const upload = (file: File) => act("picture", async () => {

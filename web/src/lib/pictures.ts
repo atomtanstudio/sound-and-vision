@@ -13,7 +13,11 @@ export interface PictureChoice {
 /** The short name for a picker. */
 export const choiceLabel = (c: PictureChoice) => (c.id === "local" ? `On ${machine()}` : c.name);
 
-/** Before a picture from a paid service: the person says yes, every time (they asked for that). */
-export function okToSpend(c: PictureChoice | undefined, what = "this picture"): boolean {
-  return !c?.paid || window.confirm(`${c.name} may charge your account for ${what}. Go ahead?`);
+/** Before a picture from a paid service: the person says yes, every time (they asked for that). `using`: the model
+ *  and settings chosen there in Settings ("GPT Image 2.5, 2K, high"), so they know what they're paying for. */
+export function okToSpend(c: PictureChoice | undefined, what = "this picture", using = ""): boolean {
+  return !c?.paid || window.confirm(`${c.name}${using ? ` (${using})` : ""} may charge your account for ${what}. Go ahead?`);
 }
+
+/** What /api/covers/settings says is chosen on MCP servers, by role ("" for a server's own default). */
+export type Using = Partial<Record<"covers" | "scenes" | "motion", string>>;

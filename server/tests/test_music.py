@@ -152,7 +152,7 @@ def test_a_part_of_the_song_is_asked_for_by_its_times_without_a_title_screen():
     m = music.Music.__new__(music.Music)
     m._ready = lambda pid: ({"id": pid}, {"duration": 219.28})
     m._new = lambda pid, request, feel, shape, model, effort, **extra: extra
-    m.writers = types.SimpleNamespace(picture_by=lambda role: "local")
+    m.writers = types.SimpleNamespace(picture_by=lambda role: "local", step=lambda role: {"provider": "local"})
     got = m.start("p1", kind="performance", opening=False, part={"start": 179.202, "end": 209.85, "label": "the final chorus"})
     assert got["opening"] and got["part"] == {"start": 179.202, "end": 209.85, "label": "the final chorus"}
     assert got["pictures"] == "local" and m.connectors(got) == []  # pictures from the app: no picture connector

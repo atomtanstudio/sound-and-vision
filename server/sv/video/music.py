@@ -26,6 +26,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from ..catalog import choice_words
 from ..comfy.client import ComfyError
 from ..covers import krea_graph
 from ..jobs import Context, JobError
@@ -169,20 +170,29 @@ still with `python3 tools/h3.py` on the GPU instead and say so. Follow any job t
 `clips/` with `curl`.{paid}"""
 
 
-def motion_section(by: str, server: dict | None = None) -> str:
-    """The Surreal notes' Motion section for this video."""
+USE = """
+
+Make every {what} with {choice}. The person chose these in Settings to control what the video costs: use no other model
+and no other values for these settings (leave the rest at the server's defaults). If a {what} needs something they
+don't allow, say so in your notes rather than changing them."""
+
+
+def motion_section(by: str, server: dict | None = None, use: str = "") -> str:
+    """The Surreal notes' Motion section for this video. `use`: the model and settings the person chose on their MCP
+    server (sv/catalog.py's choice_words)."""
     if by == "mitte":
         return f"## Motion: hosted H3 (Mitte)\n\n{MITTE_MOTION}\n"
     if server:
         from ..mcp import slug
         return "## Motion: " + server["name"] + "\n\n" + MCP_MOTION.format(
             name=server["name"], slug=slug(server["name"]),
-            paid=" Every clip may cost the person money, so make the ones you need." if server.get("paid") else "") + "\n"
+            paid=" Every clip may cost the person money, so make the ones you need." if server.get("paid") else "") + \
+            (USE.format(what="clip", choice=use) if use else "") + "\n"
     return f"## Motion: MiniMax H3 (`tools/h3.py`)\n\n{H3_MOTION}\n"
 
 
-def pictures_section(by: str, singing: bool, server: dict | None = None) -> str:
-    """The notes' Pictures section for this video."""
+def pictures_section(by: str, singing: bool, server: dict | None = None, use: str = "") -> str:
+    """The notes' Pictures section for this video. `use`: as motion_section's."""
     kind = "singing" if singing else "surreal"
     if by in PICTURE_BY:
         body = PICTURE_TOOL.format(name=PICTURE_BY[by], refs=PICTURE_REFS[by], cost=PICTURE_COST[by])
@@ -194,6 +204,8 @@ def pictures_section(by: str, singing: bool, server: dict | None = None) -> str:
         from ..mcp import slug
         body = PICTURE_MCP.format(name=server["name"], slug=slug(server["name"]),
                                   paid=" Every picture may cost the person money, so make the ones you need." if server.get("paid") else "")
+        if use:
+            body += USE.format(what="picture", choice=use)
     else:
         body = PICTURE_TOOL.format(name=PICTURE_BY["local"], refs=PICTURE_REFS["local"], cost=PICTURE_COST["local"])
     return f"## Pictures\n\n{body}\n\n{PICTURE_WHERE[kind]}\n"
@@ -221,9 +233,16 @@ class Music(Kinetic):
                 raise JobError("Choose a part of the song between 5 seconds and 2 minutes long.")
             extra["part"] = {"start": round(a, 3), "end": round(min(b, length), 3), "label": str(part.get("label") or "")[:60]}
         extra["pictures"] = self.writers.picture_by("scenes")  # fixed for this film, notes and all
+        extra["picturesWith"] = self._with("scenes")
         if kind not in SINGING:  # (the singing kinds film every scene through the Video Builder)
             extra["motion"] = self.writers.motion_by()
+            extra["motionWith"] = self._with("motion")
         return self._new(pid, request, feel, "wide", model, effort, **extra)
+
+    def _with(self, role: str) -> dict:
+        """The model and settings chosen for a role on an MCP server ({} for its own default, or another provider)."""
+        step = self.writers.step(role)
+        return {k: step[k] for k in ("model", "options") if step.get(k)} if str(step.get("provider")).startswith("mcp:") else {}
 
     def pictures(self, film: dict) -> str:
         """Who makes this video's pictures: as chosen when it started (a film from before the choice existed: Mitte where
@@ -289,14 +308,16 @@ class Music(Kinetic):
         if sep:
             tail = rest[rest.find("\n## "):] if "\n## " in rest else ""
             server = self.writers.mcp.get(by.removeprefix("mcp:")) if by.startswith("mcp:") else None
-            (work / "CLAUDE.md").write_text(head + "\n" + pictures_section(by, singing, server) + tail)
+            use = choice_words(self.writers.catalogs, server["id"], "image", film.get("picturesWith")) if server else ""
+            (work / "CLAUDE.md").write_text(head + "\n" + pictures_section(by, singing, server, use) + tail)
         clips = self.motion(film)
         notes = (work / "CLAUDE.md").read_text()
         head, sep, rest = notes.partition("\n## Motion")
         if sep:
             tail = rest[rest.find("\n## "):] if "\n## " in rest else ""
             server = self.writers.mcp.get(clips.removeprefix("mcp:")) if clips.startswith("mcp:") else None
-            (work / "CLAUDE.md").write_text(head + "\n" + motion_section(clips, server) + tail)
+            use = choice_words(self.writers.catalogs, server["id"], "video", film.get("motionWith")) if server else ""
+            (work / "CLAUDE.md").write_text(head + "\n" + motion_section(clips, server, use) + tail)
         (work / "tools").mkdir(exist_ok=True)
         shutil.copyfile(HERE / "h3tool.py", work / "tools" / "h3.py")
         shutil.copyfile(HERE / "picturetool.py", work / "tools" / "picture.py")

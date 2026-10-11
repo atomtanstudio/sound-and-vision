@@ -193,3 +193,23 @@
   font-size: 12.5px;
   color: var(--text-2);
 }
+
+/* a picture or clip job's model settings, under its row */
+.st-media-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: -2px 0 4px 202px;
+}
+.st-media-opts .st-field {
+  min-width: 150px;
+}
+.st-wait {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+@media (max-width: 760px) {
+  .st-media-opts {
+    margin-left: 0;
+  }
+}

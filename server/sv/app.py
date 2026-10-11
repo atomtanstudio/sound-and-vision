@@ -62,6 +62,7 @@ sched.register("song.yue2", "gpu", run_yue2_take)
 sched.register("song.other", "gpu", run_other_take)
 sched.register("analysis", "gpu", run_analysis)
 writers = Writers(cfg, store)
+writers.on_mcp = lambda: hub.publish("mcp", {})  # a server's catalog is in
 
 
 class _App:  # what songs.start_takes needs from here
@@ -504,25 +505,39 @@ class McpPatch(BaseModel):
 
 @app.get("/api/mcp")
 async def mcp_list() -> list[dict]:
-    """Your MCP servers (never their keys)."""
-    return writers.mcp.listed()
+    """Your MCP servers (never their keys), each with its catalog of models."""
+    return writers.mcp_listed()
 
 
 @app.post("/api/mcp")
 async def mcp_add(body: McpIn) -> dict:
     """Add a server: it's connected to and its tools listed first, so one that doesn't answer isn't kept."""
     try:
-        return await writers.mcp.add(body.name, body.url, body.header, body.key, body.paid)
+        rec = await writers.mcp.add(body.name, body.url, body.header, body.key, body.paid)
     except MCPError as exc:
         raise _err(422, str(exc)) from None
+    await writers.read_models_once(rec["id"])  # its models, read by themselves (sv/catalog.py)
+    return next((s for s in writers.mcp_listed() if s["id"] == rec["id"]), rec)
 
 
 @app.post("/api/mcp/{sid}/check")
 async def mcp_check(sid: str) -> dict:
     try:
-        return await writers.mcp.check(sid)
+        rec = await writers.mcp.check(sid)
     except MCPError as exc:
         raise _err(404, str(exc)) from None
+    await writers.read_models_once(sid)
+    return next((s for s in writers.mcp_listed() if s["id"] == sid), rec)
+
+
+@app.post("/api/mcp/{sid}/catalog")
+async def mcp_catalog(sid: str) -> dict:
+    """Read the server's models, in the background: Claude reads its tools and may only look things up, so nothing is
+    made or spent. The interface is told when it's in ("mcp")."""
+    if writers.mcp.get(sid) is None:
+        raise _err(404, "There's no such server.")
+    writers.catalogs.start(writers, sid)
+    return next(s for s in writers.mcp_listed() if s["id"] == sid)
 
 
 @app.patch("/api/mcp/{sid}")
@@ -563,6 +578,7 @@ async def mcp_callback(state: str = "", code: str = "", error: str = "", error_d
     else:
         try:
             rec = await writers.mcp.finish_signin(state, code)
+            await writers.read_models_once(rec["id"])
             msg = f"Signed in to {rec['name']}: {len(rec.get('tools') or [])} tools." if rec.get("ok") else \
                 f"Signed in to {rec['name']}, but it didn't answer: {rec.get('error')}"
         except MCPError as exc:
@@ -579,9 +595,11 @@ class AddressIn(BaseModel):
 async def mcp_signin_pasted(body: AddressIn) -> dict:
     """The address the browser ended on after signing in, pasted (when it couldn't come back to the app by itself)."""
     try:
-        return await writers.mcp.finish_from_address(body.address)
+        rec = await writers.mcp.finish_from_address(body.address)
     except MCPError as exc:
         raise _err(422, str(exc)) from None
+    await writers.read_models_once(rec["id"])
+    return rec
 
 
 @app.post("/api/mcp/{sid}/signout")
@@ -596,6 +614,7 @@ async def mcp_signout(sid: str) -> dict:
 async def mcp_remove(sid: str) -> dict:
     """Pictures it made stay; anything set to use it goes back to the GPU."""
     writers.mcp.remove(sid)
+    writers.catalogs.drop(sid)
     return {"ok": True}
 
 

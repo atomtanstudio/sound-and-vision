@@ -5,7 +5,7 @@ import { CoverLook } from "../look/CoverLook";
 import { useSong } from "../state/song";
 import { Button, Modal, Segmented, TextArea } from "../ui/controls";
 import { machine } from "../lib/machine";
-import { choiceLabel, okToSpend, type PictureChoice } from "../lib/pictures";
+import { choiceLabel, okToSpend, type PictureChoice, type Using } from "../lib/pictures";
 import { Doer, useWho } from "../state/who";
 
 interface CoverSettings {
@@ -13,6 +13,7 @@ interface CoverSettings {
   auto: string;
   artist: string;
   choices: PictureChoice[];
+  using?: Using;
 }
 
 /** The song's sleeve beside its title: the art, or a button to make it. Opens the cover panel. */
@@ -70,7 +71,8 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
   };
   const chosen = settings?.choices.find((c) => c.id === engine);
   const make = () =>
-    okToSpend(chosen) && run("make", async () => {
+    // (the model and settings from Settings go with the covers' own choice; another one uses its default)
+    okToSpend(chosen, "this picture", engine === settings?.engine ? settings?.using?.covers : "") && run("make", async () => {
       if (settings && (engine !== settings.engine || (!cover && artist !== settings.artist))) {
         await api.put("/api/covers/settings", { engine, artist: cover ? undefined : artist });
       }

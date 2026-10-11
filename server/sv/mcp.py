@@ -207,12 +207,15 @@ class Servers:
         return self._public(rec)
 
     async def _check(self, rec: dict) -> dict:
-        """Connect and list its tools: {ok, tools: [{name, description}], checked, error, needsSignIn}."""
+        """Connect and list its tools: {ok, tools: [{name, description, readOnly?}], checked, error, needsSignIn}.
+        `readOnly`: the server says the tool only looks things up (MCP's readOnlyHint)."""
         try:
             async with Session(rec["url"], await self._headers(rec), transport=self.transport) as s:
                 tools = await s.tools()
             return {"ok": True, "error": None, "needsSignIn": False, "checked": time.time(),
-                    "tools": [{"name": t.get("name", ""), "description": (t.get("description") or "")[:300]} for t in tools]}
+                    "tools": [{"name": t.get("name", ""), "description": (t.get("description") or "")[:300],
+                               **({"readOnly": True} if (t.get("annotations") or {}).get("readOnlyHint") is True else {})}
+                              for t in tools]}
         except NeedsSignIn as exc:
             if rec.get("headers"):
                 return {"ok": False, "error": "The server refused the key.", "checked": time.time()}
@@ -381,6 +384,14 @@ class Servers:
         rec["tokens"], rec["ok"] = None, False
         self._write(servers)
         return self._public(rec)
+
+    async def tools_of(self, sid: str) -> list[dict]:
+        """A server's tools as it describes them, in full: names, descriptions and input schemas."""
+        rec = self.get(sid)
+        if rec is None:
+            raise MCPError("There's no such server.")
+        async with Session(rec["url"], await self._headers(rec), transport=self.transport) as s:
+            return await s.tools()
 
     # ---- for Claude ---------------------------------------------------------------------------
     def _usable(self, ids: list[str] | None) -> list[dict]:
