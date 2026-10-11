@@ -1111,17 +1111,41 @@
 .sp-title {
   align-items: center;
 }
+.cv-open {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  cursor: pointer;
+}
+.cv-open-label {
+  font-size: 11.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.cv-open:hover .cv-open-label,
+.cv-open:focus-visible .cv-open-label {
+  color: var(--text);
+}
+.cv-open:hover .cv-thumb,
+.cv-open:focus-visible .cv-thumb {
+  border-color: var(--line-3);
+}
 .cv-thumb {
   position: relative;
-  flex: none;
+  display: grid;
+  place-items: center;
   width: 64px;
   height: 64px;
-  padding: 0;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--surface);
   overflow: hidden;
-  cursor: pointer;
   box-shadow: var(--shadow-1);
 }
 .cv-thumb img {
@@ -1133,11 +1157,8 @@
 .cv-thumb.cv-empty {
   border-style: dashed;
   color: var(--text-3);
-  font-size: 11.5px;
-  font-weight: 650;
-}
-.cv-thumb:hover {
-  border-color: var(--line-3);
+  font-size: 20px;
+  font-weight: 500;
 }
 .cv-spin {
   position: absolute;
@@ -1249,6 +1270,18 @@
   color: var(--text-2);
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+.cv-with {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.cv-with strong {
+  color: var(--text);
+  font-weight: 650;
 }
 .cv-link {
   padding: 0;

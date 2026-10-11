@@ -132,7 +132,7 @@ class Quick:
         except yue2.SongError as exc:
             raise JobError(str(exc)) from None
         covers = getattr(self.app, "covers", None)
-        if covers and (auto := covers.settings()["auto"]) != "off":
+        if covers and (auto := covers.auto_engine()):
             covers.start(pid, auto)  # the sleeve, made while the takes sing
         return {"projectId": pid, "takes": [t["id"] for t in made["takes"]], "style": made["style"], "by": by}
 

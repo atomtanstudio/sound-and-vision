@@ -74,6 +74,13 @@ class Comfy:
             self._object_info = r.json()
         return self._object_info
 
+    async def models(self, folder: str) -> list[str]:
+        """The model files ComfyUI has in one of its folders ("diffusion_models", "text_encoders", "vae", …)."""
+        r = await self.http.get(f"/models/{folder}", timeout=20)
+        r.raise_for_status()
+        got = r.json()
+        return [str(x) for x in got] if isinstance(got, list) else []
+
     async def queue_size(self) -> int:
         r = await self.http.get("/queue")
         r.raise_for_status()

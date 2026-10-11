@@ -291,7 +291,7 @@ default; anything left out uses the default. The ones you're most likely to chan
 | `SV_PORT` | `7660` | The app's port. |
 | `SV_OPEN_NETWORKS` | empty | Networks that need no key (comma-separated). Empty: every browser pairs. |
 | `SV_HOSTS` | empty | Other names you open the app by (comma-separated). |
-| `SV_MACHINE` | "the server" | What the interface calls this machine. |
+| `SV_MACHINE` | its hostname | What the interface calls this machine (the name by the status light, "Krea 2 on …"). |
 | `SV_COMFY` | `http://127.0.0.1:8210` | sv-comfy. |
 | `SV_OTHER_COMFYS` | empty | Other ComfyUIs on the machine to ask to unload their models before a big job. |
 | `SV_MUSIC` | empty | Your music for the Influence Engine: a folder (`Artist/…/Song.flac`) or `smb://host/share/path`. |

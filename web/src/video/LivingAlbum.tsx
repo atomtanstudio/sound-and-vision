@@ -6,7 +6,7 @@ import { useSong } from "../state/song";
 import { usePlayer } from "../state/player";
 import { Button, Disclosure, Segmented, TextArea } from "../ui/controls";
 import { machine } from "../lib/machine";
-import { choiceLabel, okToSpend, type PictureChoice, type Using } from "../lib/pictures";
+import { okToSpend, onSettingsChanged, openSettings, type PictureChoice, type Using } from "../lib/pictures";
 import { Doer, doer, useWho } from "../state/who";
 
 const LETTER = { a: "A", b: "B", c: "C", d: "D" } as Record<string, string>;
@@ -356,18 +356,21 @@ function PictureStep({ project, chosen, job, busy, act, onChange, onCancel }: {
   const [steer, setSteer] = useState("");
   const [words, setWords] = useState("");
   const [exact, setExact] = useState(false);
-  const [engine, setEngine] = useState("local");
-  const [choices, setChoices] = useState<PictureChoice[]>([]);
-  const [defaults, setDefaults] = useState({ engine: "", using: "" }); // the covers' choice in Settings, and its model
+  // the album covers' choice in Settings (which these pictures are made with), and it in words; read again whenever
+  // Settings closes
+  const [covers, setCovers] = useState<{ choice?: PictureChoice; using: string; madeWith: string }>({ using: "", madeWith: "" });
   const fileRef = useRef<HTMLInputElement>(null);
   const cover = project.cover;
   const earlier = (project.covers ?? []).filter((c) => c.n !== cover?.n).slice(-6).reverse();
   const madeBy = !cover ? "" : cover.made.engine === "upload" ? "your picture" : cover.made.model;
 
   useEffect(() => {
-    void api.get<{ engine: string; choices: PictureChoice[]; using?: Using }>("/api/covers/settings")
-      .then((s) => { setEngine(s.engine); setChoices(s.choices); setDefaults({ engine: s.engine, using: s.using?.covers ?? "" }); })
+    const read = () => void api.get<{ engine: string; choices: PictureChoice[]; using?: Using; madeWith?: Using }>("/api/covers/settings")
+      .then((s) => setCovers({ choice: s.choices.find((c) => c.id === s.engine), using: s.using?.covers ?? "",
+                               madeWith: s.madeWith?.covers ?? "" }))
       .catch(() => undefined);
+    read();
+    return onSettingsChanged(read);
   }, []);
 
   if (chosen && cover) {
@@ -382,9 +385,9 @@ function PictureStep({ project, chosen, job, busy, act, onChange, onCancel }: {
       </div>
     );
   }
-  const make = () => okToSpend(choices.find((c) => c.id === engine), "this picture", engine === defaults.engine ? defaults.using : "") && act("picture", () => api.post(`/api/projects/${project.id}/cover`, how === "moving"
-    ? { engine, note: steer, moving: true, forLiving: true }
-    : exact ? { engine, prompt: words, forLiving: true } : { engine, note: words, moving: true, forLiving: true }));
+  const make = () => okToSpend(covers.choice, "this picture", covers.using) && act("picture", () => api.post(`/api/projects/${project.id}/cover`, how === "moving"
+    ? { note: steer, moving: true, forLiving: true }
+    : exact ? { prompt: words, forLiving: true } : { note: words, moving: true, forLiving: true }));
   const upload = (file: File) => act("picture", async () => {
     const form = new FormData();
     form.append("file", file);
@@ -445,8 +448,8 @@ function PictureStep({ project, chosen, job, busy, act, onChange, onCancel }: {
         </div>
       ) : (
         <div className="la-form la-make">
-          <Segmented size="sm" label="Made with" value={engine} onChange={setEngine}
-            options={choices.map((c) => ({ value: c.id, label: choiceLabel(c), hint: c.note }))} />
+          <span className="la-note la-with">Made with <strong>{covers.madeWith || covers.choice?.name || "…"}</strong>
+            {" "}<button type="button" className="cv-link" onClick={openSettings}>Change in Settings</button></span>
           <Button busy={busy === "picture" || !!job} disabled={!!busy || !!job || (how === "describe" && !words.trim())} onClick={() => void make()}>
             Make it
           </Button>

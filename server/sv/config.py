@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import socket
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
@@ -98,6 +99,13 @@ def networks(text: str) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, 
     return tuple(out)
 
 
+def own_name() -> str:
+    """What the interface calls this machine when SV_MACHINE doesn't say: its own name (its hostname, without a
+    domain), or "the server" when it has none worth showing."""
+    name = socket.gethostname().split(".")[0].strip()
+    return name if name and name.lower() not in ("localhost", "localhost-localdomain", "ubuntu", "debian") else "the server"
+
+
 def load() -> Config:
     data = _p("SV_DATA", ROOT / "data")
     models = _p("SV_MODELS", ROOT / "models")
@@ -106,7 +114,7 @@ def load() -> Config:
     return Config(
         data=data,
         web=web if (web / "index.html").is_file() else None,
-        machine=os.environ.get("SV_MACHINE") or "the server",
+        machine=os.environ.get("SV_MACHINE") or own_name(),
         open_networks=networks(os.environ.get("SV_OPEN_NETWORKS", "")),
         hosts=_list("SV_HOSTS"),
         comfy=comfy,

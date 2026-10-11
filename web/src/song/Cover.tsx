@@ -5,15 +5,17 @@ import { CoverLook } from "../look/CoverLook";
 import { useSong } from "../state/song";
 import { Button, Modal, Segmented, TextArea } from "../ui/controls";
 import { machine } from "../lib/machine";
-import { choiceLabel, okToSpend, type PictureChoice, type Using } from "../lib/pictures";
+import { okToSpend, onSettingsChanged, openSettings, type PictureChoice, type Using } from "../lib/pictures";
 import { Doer, useWho } from "../state/who";
 
 interface CoverSettings {
-  engine: string;
-  auto: string;
+  engine: string; // the album covers' choice in Settings
+  auto: "on" | "off"; // a cover with every song from the Home prompt
+  autoPaid?: boolean; // the album covers' choice may cost money, so new songs don't get one by themselves
   artist: string;
   choices: PictureChoice[];
   using?: Using;
+  madeWith?: Partial<Record<"covers" | "scenes" | "motion", string>>; // exactly what Settings chose, in words
 }
 
 /** The song's sleeve beside its title: the art, or a button to make it. Opens the cover panel. */
@@ -26,10 +28,13 @@ export function CoverThumb() {
   const cover = project.cover;
   return (
     <>
-      <button type="button" className={"cv-thumb" + (cover ? "" : " cv-empty") + (job ? " cv-busy" : "")} onClick={() => setOpen(true)}
-        title={cover ? "The cover" : "Make cover art"}>
-        {cover ? <img src={fileUrl(project.id, cover.small)} alt="Cover" /> : <span>{job ? "" : "+ Cover"}</span>}
-        {job && <span className="cv-spin" aria-label={job.message || "Making the cover"} />}
+      <button type="button" className="cv-open" onClick={() => setOpen(true)}
+        title={cover ? "Change the cover: a new picture, your own prompt, or an earlier one" : "Make cover art for this song"}>
+        <span className={"cv-thumb" + (cover ? "" : " cv-empty") + (job ? " cv-busy" : "")}>
+          {cover ? <img src={fileUrl(project.id, cover.small)} alt="" /> : <span>{job ? "" : "+"}</span>}
+          {job && <span className="cv-spin" aria-label={job.message || "Making the cover"} />}
+        </span>
+        <span className="cv-open-label">{job ? "Painting…" : cover ? "Edit cover" : "Add cover"}</span>
       </button>
       {open && <CoverPanel job={job} onClose={() => setOpen(false)} />}
     </>
@@ -43,7 +48,6 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
     .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0]);
   const cover = project.cover;
   const [settings, setSettings] = useState<CoverSettings | null>(null);
-  const [engine, setEngine] = useState("local");
   const [note, setNote] = useState("");
   const [mine, setMine] = useState(false); // the person writes the prompt, rather than the small-chores model
   const [own, setOwn] = useState("");
@@ -53,11 +57,13 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
   const [looking, setLooking] = useState(false);
 
   useEffect(() => {
-    void api.get<CoverSettings>("/api/covers/settings").then((s) => {
+    // what Settings has chosen for album covers, read again whenever Settings closes
+    const read = () => void api.get<CoverSettings>("/api/covers/settings").then((s) => {
       setSettings(s);
-      setEngine(s.engine);
-      if (!cover) setArtist(s.artist);
-    });
+      if (!cover) setArtist((a) => a || s.artist);
+    }).catch(() => undefined);
+    read();
+    return onSettingsChanged(read);
   }, [cover]);
 
   const run = async (what: string, fn: () => Promise<unknown>) => {
@@ -71,19 +77,20 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
       setBusy(null);
     }
   };
-  const chosen = settings?.choices.find((c) => c.id === engine);
-  // a new picture: from a prompt the small-chores model writes (steered by the direction), from the person's own
-  // prompt, or from the same prompt as the cover now ("again")
+  const chosen = settings?.choices.find((c) => c.id === settings.engine);
+  // a new picture, made as Settings says for album covers: from a prompt the small-chores model writes (steered by
+  // the direction), from the person's own prompt, or from the same prompt as the cover now ("again")
   const make = (how: "new" | "mine" | "again") =>
-    // (the model and settings from Settings go with the covers' own choice; another one uses its default)
-    okToSpend(chosen, "this picture", engine === settings?.engine ? settings?.using?.covers : "") && run(how, async () => {
-      if (settings && (engine !== settings.engine || (!cover && artist !== settings.artist))) {
-        await api.put("/api/covers/settings", { engine, artist: cover ? undefined : artist });
-      }
+    okToSpend(chosen, "this picture", settings?.using?.covers) && run(how, async () => {
+      if (settings && !cover && artist !== settings.artist) await api.put("/api/covers/settings", { artist });
       const prompt = how === "mine" ? own.trim() : how === "again" ? cover?.prompt ?? "" : "";
-      const j = await api.post<Job>(`/api/projects/${project.id}/cover`, { engine, note: how === "new" ? note : "", prompt });
+      const j = await api.post<Job>(`/api/projects/${project.id}/cover`, { note: how === "new" ? note : "", prompt });
       useSong.getState().onJob(j);
     });
+  const change = () => {  // Settings, where the choice lives (this panel reads it again when Settings closes)
+    onClose();
+    openSettings();
+  };
   const writeMine = (from: string) => {
     setMine(true);
     setOwn(from);
@@ -155,9 +162,11 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
           )}
           <section>
             <h3>{cover ? "A new picture" : "Make the cover"}</h3>
-            <Segmented label="Made with" value={engine} onChange={setEngine}
-              options={(settings?.choices ?? []).map((c) => ({ value: c.id, label: choiceLabel(c), hint: c.note }))} />
-            <p className="cv-note">{chosen?.note}</p>
+            <div className="cv-with">
+              <span>Made with <strong>{settings?.madeWith?.covers ?? chosen?.name ?? "…"}</strong>
+                {chosen?.connected === false ? " (not connected)" : ""}</span>
+              <button type="button" className="cv-link" onClick={change}>Change in Settings</button>
+            </div>
             <Segmented size="sm" label="The prompt" value={mine ? "mine" : "theirs"}
               onChange={(v) => (v === "mine" ? writeMine(own || cover?.prompt || "") : setMine(false))}
               options={[{ value: "theirs", label: `${Doer(roles, "chores")} writes it` }, { value: "mine", label: "I'll write it" }]} />
@@ -207,11 +216,14 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
           {settings && (
             <section>
               <h3>Songs from the Home prompt</h3>
-              <Segmented size="sm" label="A cover with every new song" value={settings.auto}
+              <Segmented size="sm" label="A cover with every new song" value={settings.autoPaid ? "off" : settings.auto}
                 onChange={(auto) => void api.put<CoverSettings>("/api/covers/settings", { auto }).then(setSettings)}
-                options={[...settings.choices.filter((c) => !c.paid).map((c) => ({ value: c.id, label: choiceLabel(c), hint: c.note })),
-                  { value: "off", label: "No cover" }]} />
-              <p className="cv-note">Each song typed on Home gets a cover while its takes sing.</p>
+                options={[{ value: "on", label: "Yes", disabled: !!settings.autoPaid }, { value: "off", label: "No" }]} />
+              <p className="cv-note">
+                {settings.autoPaid
+                  ? "Your album covers come from a source that may cost money, so new songs don't get one by themselves."
+                  : `Each song typed on Home gets a cover from ${settings.madeWith?.covers ?? "your album covers' choice"} while its takes sing.`}
+              </p>
             </section>
           )}
           {failed?.status === "failed" && !job && <p className="ie-err">The last try didn't work: {failed.message}</p>}

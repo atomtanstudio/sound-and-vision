@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pictures for this video, made by the Sound / Vision app with whatever the person chose for them in Settings (ChatGPT's
-image tool, or Krea 2 on the machine's GPU), one at a time, in the order sent, while this session runs. (Copied into a
-music video's folder as tools/picture.py.)
+image tool, Grok Imagine, or an image model on the machine's GPU), one at a time, in the order sent, while this session
+runs. (Copied into a music video's folder as tools/picture.py.)
 
   python3 tools/picture.py "PROMPT" --out shots/s01.png [--shape 16:9] [--ref PICTURE ...]
   python3 tools/picture.py --prompt-file prompts/s01.txt --out shots/s01.png
@@ -9,7 +9,7 @@ music video's folder as tools/picture.py.)
   python3 tools/picture.py --wait ID [ID ...]     wait for pictures sent with --no-wait
 
 --shape is 16:9 (the default), 1:1, 9:16, 4:5 or 3:2. --ref gives up to five pictures of the same person, place or
-thing to keep (ChatGPT uses them; Krea 2 can't, and says so). Paths are inside this folder. Each finished picture prints
+thing to keep (a source that can't use them says so). Paths are inside this folder. Each finished picture prints
 one JSON line: {"ok": true, "out": ..., "by": ...} or {"ok": false, "error": ...}; the exit code is 0 only if every
 picture came back.
 """

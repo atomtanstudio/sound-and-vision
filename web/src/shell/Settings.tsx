@@ -18,6 +18,7 @@ interface Connections {
   motionRoles?: Record<string, string>;
   motionProviders?: ImageProvider[];
   mcp?: McpServer[];
+  providerModels?: Record<string, Partial<Record<"image" | "video", CatalogModel[]>>>; // Grok's Imagine models
 }
 
 /** One of your MCP servers (its key never comes back from the server). */
@@ -265,6 +266,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                     const server = step.provider.startsWith("mcp:") ? c.mcp?.find((m) => `mcp:${m.id}` === step.provider) : undefined;
                     return (
                       <MediaRow key={role} label={label} choices={choices} step={step} server={server}
+                        own={c.providerModels?.[step.provider]?.[role in (c.motionRoles ?? {}) ? "video" : "image"]}
                         kind={role in (c.motionRoles ?? {}) ? "video" : "image"}
                         onSet={(next) => void setPictures(role, next)} onRead={(id) => void readModels(id)} />
                     );
@@ -295,11 +297,12 @@ function filmOptions(c: Connections): Option[] {
 
 /** One picture or clip job in Settings: who makes it and, on an MCP server, which of its models and with what settings
  *  (from the server's catalog; read it first if it hasn't been). */
-function MediaRow({ label, choices, step, server, kind, onSet, onRead }: {
+function MediaRow({ label, choices, step, server, own, kind, onSet, onRead }: {
   label: string;
   choices: ImageProvider[];
   step: Step;
   server?: McpServer;
+  own?: CatalogModel[]; // a provider's own models (Grok Imagine's), when it has a choice of them
   kind: "image" | "video";
   onSet: (step: { provider: string; model?: string | null; options?: Record<string, string> }) => void;
   onRead: (id: string) => void;
@@ -312,7 +315,16 @@ function MediaRow({ label, choices, step, server, kind, onSet, onRead }: {
   const what = kind === "video" ? "clip" : "picture";
   let middle = null;
   let note = chosen?.note;
-  if (server && (!cat || cat.state === "none" || (cat.state === "error" && !models.length))) {
+  if (!server && own?.length) {  // Grok: its picture models (the first is its default), or the one it makes clips with
+    const pick = own.find((x) => x.id === step.model) ?? own[0];
+    middle = own.length === 1 ? <span className="st-wait">{pick.name}</span> : (
+      <select className="in" value={pick.id} aria-label={`${label}: model`}
+        onChange={(e) => onSet({ provider: step.provider, model: e.target.value })}>
+        {own.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+      </select>
+    );
+    note = pick.note || note;
+  } else if (server && (!cat || cat.state === "none" || (cat.state === "error" && !models.length))) {
     middle = <Button size="sm" kind="ghost" onClick={() => onRead(server.id)}>Read its models</Button>;
     note = cat?.state === "error" ? cat.error : `Lists the ${what} models ${server.name} runs, with their settings, so you can choose one. Nothing is made.`;
   } else if (server && cat?.state === "reading") {
@@ -335,7 +347,7 @@ function MediaRow({ label, choices, step, server, kind, onSet, onRead }: {
       <div className="st-role">
         <span>{label}</span>
         <select className="in" value={step.provider} onChange={(e) => onSet({ provider: e.target.value })}>
-          {choices.map((x) => (
+          {choices.filter((x) => x.connected !== false || x.id === step.provider).map((x) => (
             <option key={x.id} value={x.id}>{x.name}{x.connected === false ? " (not connected)" : ""}</option>
           ))}
         </select>

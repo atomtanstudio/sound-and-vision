@@ -63,6 +63,7 @@ sched.register("song.other", "gpu", run_other_take)
 sched.register("analysis", "gpu", run_analysis)
 writers = Writers(cfg, store)
 writers.on_mcp = lambda: hub.publish("mcp", {})  # a server's catalog is in
+writers.comfy = comfy  # (which local image models there are)
 
 
 class _App:  # what songs.start_takes needs from here
@@ -910,12 +911,13 @@ async def cover_text(pid: str, body: CoverTextIn) -> dict:
 
 @app.get("/api/covers/settings")
 async def cover_settings() -> dict:
-    return covers.settings()
+    return covers.settings(await writers.statuses())
 
 
 @app.put("/api/covers/settings")
 async def set_cover_settings(body: CoverSettingsIn) -> dict:
-    return covers.set_settings(body.engine, body.artist, body.auto)
+    covers.set_settings(body.engine, body.artist, body.auto)
+    return covers.settings(await writers.statuses())
 
 
 # ---- Living Album Cover --------------------------------------------------------------------------

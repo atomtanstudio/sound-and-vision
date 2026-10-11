@@ -16,7 +16,9 @@ writes the clip and h3/done/<id>.json. By default Claude plans the whole video, 
 from __future__ import annotations
 
 import asyncio
+import io
 import json
+import math
 import os
 import random
 import re
@@ -28,9 +30,9 @@ from PIL import Image
 
 from ..catalog import choice_words
 from ..comfy.client import ComfyError
-from ..covers import krea_graph
+from .. import localpics
 from ..jobs import Context, JobError
-from ..writers import WriterError
+from ..writers import WriterError, grok_media
 from . import h3
 from .kinetic import Kinetic
 
@@ -97,10 +99,10 @@ FIRST = ("Plan the whole video for the whole song first. Then make only its firs
 
 
 # How the pictures are made, as the person chose for this video (Settings → Pictures for music videos), written into
-# the notes' Pictures section when the video starts: tools/picture.py (ChatGPT's image tool, or Krea 2 on the GPU, made
-# by the app), one of their MCP servers (Claude uses its tools), or, where the owner turned it on, their Mitte.
+# the notes' Pictures section when the video starts: tools/picture.py (ChatGPT's image tool, Grok Imagine, or one of
+# the image models on the GPU, made by the app), one of their MCP servers (Claude uses its tools), or, where the owner
+# turned it on, their Mitte.
 PICTURE_SIZES = {"16:9": (1344, 768), "1:1": (1280, 1280), "9:16": (768, 1344), "4:5": (1024, 1280), "3:2": (1344, 896)}
-PICTURE_BY = {"openai": "ChatGPT's image tool, on their ChatGPT plan", "local": "Krea 2 on this machine's GPU"}
 PICTURE_TOOL = """The person chose {name} for this video's pictures (in Settings), so make every picture with `tools/picture.py`.
 The app makes it and puts it where you say:
 
@@ -108,11 +110,25 @@ The app makes it and puts it where you say:
 
 Send several with `--no-wait`, then collect them with `--wait ID ...`; `python3 tools/picture.py --help` has the rest.
 {refs} {cost}"""
-PICTURE_REFS = {"openai": "`--ref` keeps a person, place or thing the same across pictures (up to five references).",
-                "local": "Krea 2 takes no reference pictures, so describe a recurring person or place the same way, in "
-                         "detail, every time."}
-PICTURE_COST = {"openai": "They come from the person's ChatGPT plan, which has a limit on pictures: make the ones you need.",
-                "local": "They're free, and take about half a minute each on the GPU (between H3 clips)."}
+REFS_KEPT = "`--ref` keeps a person, place or thing the same across pictures (up to five references)."
+NO_REFS = ("{name} takes no reference pictures, so describe a recurring person or place the same way, in detail, every "
+           "time.")
+
+
+def picture_maker(by: str) -> tuple[str, str, str] | None:
+    """Who makes a video's pictures through tools/picture.py: (their name in the notes, what --ref does, what they
+    cost); None when the app doesn't make them (an MCP server or Mitte: Claude does)."""
+    if by == "openai":
+        return ("ChatGPT's image tool (GPT Image 2), on their ChatGPT plan", REFS_KEPT,
+                "They come from the person's ChatGPT plan, which has a limit on pictures: make the ones you need.")
+    if by == "grok":
+        return ("Grok Imagine, on their Grok plan", REFS_KEPT.replace("up to five", "up to three"),
+                "They come from the person's Grok plan, which has limits: make the ones you need.")
+    if by == "local" or by.startswith("local:"):
+        m = localpics.of(by)
+        return (f"{m.name} on this machine's GPU", REFS_KEPT if m.refs else NO_REFS.format(name=m.name),
+                "They're free, and take about a quarter to half a minute each on the GPU (between H3 clips).")
+    return None
 PICTURE_MCP = """The person chose their MCP server "{name}" for this video's pictures (in Settings): its tools are yours
 (`mcp__{slug}__…`). Make every picture with its tool that makes pictures from a prompt; if that starts a job, follow the
 job with the server's other tools until the picture is ready, then download it into this folder with `curl`.{paid}"""
@@ -163,6 +179,16 @@ tools, not tools/h3.py:
 - 5 to 15 seconds, whole seconds. The clip comes with sound of its own: drop it (the music goes in at the end).
   It costs the person money: about $0.04 a
   second at 768P, $0.025 at 480P, so a 5-second clip is about 20¢. Make the clips you need, and keep them short."""
+GROK_MOTION = """The person chose Grok Imagine for this video's clips (in Settings). The app makes them with Grok, through the
+same tool as H3 (`tools/h3.py`), and puts each where you say:
+
+    python3 tools/h3.py shots/s01.png "what happens, how the camera moves" --seconds 6 --out clips/s01.mp4
+
+- A still is the clip's first frame. `--end shots/s02.png` pins the last frame too, for one thing turning into another.
+- 1 to 15 whole seconds. Clips are 720p (1280 × 720 at 16:9), at 24 fps; the shape follows `--size` (16:9, 9:16,
+  1:1, 4:3 or 3:4, the nearest), and the clip's own sound is dropped (the music goes in at the end).
+- About 40 seconds a clip, one at a time, in the order sent. `--no-wait` and `--wait ID …` work as they do for H3.
+- They come from the person's Grok plan, which has limits: make the clips you need, and keep them short."""
 MCP_MOTION = """The person chose their MCP server "{name}" for this video's clips (in Settings): its tools are yours
 (`mcp__{slug}__…`). Make each clip with its tool that turns a still into video, with the still as the first frame. If
 it needs the still at an address and you have only a file here, try a `data:` URL; if that's refused, animate that
@@ -182,6 +208,8 @@ def motion_section(by: str, server: dict | None = None, use: str = "") -> str:
     server (sv/catalog.py's choice_words)."""
     if by == "mitte":
         return f"## Motion: hosted H3 (Mitte)\n\n{MITTE_MOTION}\n"
+    if by == "grok":
+        return f"## Motion: Grok Imagine (`tools/h3.py`)\n\n{GROK_MOTION}\n"
     if server:
         from ..mcp import slug
         return "## Motion: " + server["name"] + "\n\n" + MCP_MOTION.format(
@@ -194,8 +222,8 @@ def motion_section(by: str, server: dict | None = None, use: str = "") -> str:
 def pictures_section(by: str, singing: bool, server: dict | None = None, use: str = "") -> str:
     """The notes' Pictures section for this video. `use`: as motion_section's."""
     kind = "singing" if singing else "surreal"
-    if by in PICTURE_BY:
-        body = PICTURE_TOOL.format(name=PICTURE_BY[by], refs=PICTURE_REFS[by], cost=PICTURE_COST[by])
+    if (maker := picture_maker(by)):
+        body = PICTURE_TOOL.format(name=maker[0], refs=maker[1], cost=maker[2])
         if singing:
             body += "\n\nPictures land as files in this folder: file them into the project where the guide puts downloaded references."
     elif by == "mitte":
@@ -207,7 +235,9 @@ def pictures_section(by: str, singing: bool, server: dict | None = None, use: st
         if use:
             body += USE.format(what="picture", choice=use)
     else:
-        body = PICTURE_TOOL.format(name=PICTURE_BY["local"], refs=PICTURE_REFS["local"], cost=PICTURE_COST["local"])
+        maker = picture_maker("local")
+        assert maker
+        body = PICTURE_TOOL.format(name=maker[0], refs=maker[1], cost=maker[2])
     return f"## Pictures\n\n{body}\n\n{PICTURE_WHERE[kind]}\n"
 
 
@@ -242,7 +272,8 @@ class Music(Kinetic):
     def _with(self, role: str) -> dict:
         """The model and settings chosen for a role on an MCP server ({} for its own default, or another provider)."""
         step = self.writers.step(role)
-        return {k: step[k] for k in ("model", "options") if step.get(k)} if str(step.get("provider")).startswith("mcp:") else {}
+        keep = str(step.get("provider")).startswith("mcp:") or step.get("provider") == "grok"
+        return {k: step[k] for k in ("model", "options") if step.get(k)} if keep else {}
 
     def pictures(self, film: dict) -> str:
         """Who makes this video's pictures: as chosen when it started (a film from before the choice existed: Mitte where
@@ -341,16 +372,17 @@ class Music(Kinetic):
     # ---- H3 and the Video Builder, beside the session --------------------------------------------------------
     async def helper(self, ctx: Context, pid: str, work: Path) -> None:
         film = self.get(self.app.store.project(pid) or {})["film"] or {}
-        pictures = self._picture_loop(ctx, pid, work, self.pictures(film))
+        pictures = self._picture_loop(ctx, pid, work, self.pictures(film), film.get("picturesWith") or {})
         if film.get("kind") not in SINGING:
-            return await asyncio.gather(self._h3_loop(ctx, pid, work), pictures)
+            return await asyncio.gather(self._h3_loop(ctx, pid, work, self.motion(film)), pictures)
         try:
-            await asyncio.gather(self._h3_loop(ctx, pid, work), pictures, self._vrgdg_loop(work, film))
+            await asyncio.gather(self._h3_loop(ctx, pid, work, "local"), pictures, self._vrgdg_loop(work, film))
         finally:  # the session is over (or stopped): nothing of it keeps running in her ComfyUI
             await self._vrgdg_stop(film)
 
-    async def _h3_loop(self, ctx: Context, pid: str, work: Path) -> None:
-        """Renders what tools/h3.py asks for, one clip at a time, in the order asked, for as long as the session runs."""
+    async def _h3_loop(self, ctx: Context, pid: str, work: Path, by: str = "local") -> None:
+        """Renders what tools/h3.py asks for, one clip at a time, in the order asked, for as long as the session runs:
+        with H3 on our ComfyUI, or with Grok Imagine when the video's clips are Grok's (`by`)."""
         queue, done = work / "h3" / "queue", work / "h3" / "done"
         while True:
             asks = sorted(queue.glob("*.json"), key=lambda f: f.stat().st_mtime) if queue.is_dir() else []
@@ -367,14 +399,15 @@ class Music(Kinetic):
             try:
                 if not isinstance(req, dict):
                     raise JobError("The request wasn't readable JSON.")
-                answer = {"ok": True, **await self._render(ctx, pid, work, rid, req)}
+                answer = {"ok": True, **await (self._grok_clip(pid, work, rid, req) if by == "grok" else
+                                               self._render(ctx, pid, work, rid, req))}
             except (JobError, ComfyError) as exc:
                 answer = {"ok": False, "error": exc.message}
             except OSError as exc:
                 answer = {"ok": False, "error": f"A file couldn't be read or written: {exc}"}
             reply(work, done, f"{rid}.json", answer)
 
-    async def _picture_loop(self, ctx: Context, pid: str, work: Path, by: str) -> None:
+    async def _picture_loop(self, ctx: Context, pid: str, work: Path, by: str, use: dict | None = None) -> None:
         """Makes what tools/picture.py asks for, one picture at a time, in the order asked, while the session runs."""
         queue, done = work / "pictures" / "queue", work / "pictures" / "done"
         while True:
@@ -391,7 +424,7 @@ class Music(Kinetic):
             try:
                 if not isinstance(req, dict):
                     raise JobError("The request wasn't readable JSON.")
-                answer = {"ok": True, **await self._picture(ctx, pid, work, ask.stem, req, by)}
+                answer = {"ok": True, **await self._picture(ctx, pid, work, ask.stem, req, by, use or {})}
             except (JobError, ComfyError) as exc:
                 answer = {"ok": False, "error": exc.message}
             except WriterError as exc:
@@ -400,7 +433,8 @@ class Music(Kinetic):
                 answer = {"ok": False, "error": f"A file couldn't be read or written: {exc}"}
             reply(work, done, f"{ask.stem}.json", answer)
 
-    async def _picture(self, ctx: Context, pid: str, work: Path, rid: str, req: dict, by: str) -> dict:
+    async def _picture(self, ctx: Context, pid: str, work: Path, rid: str, req: dict, by: str, use: dict | None = None) -> dict:
+        use = use or {}  # the model chosen for them in Settings (Grok's), fixed when the video started
         root = work.resolve()
 
         def inside(rel: object, what: str, must_exist: bool = True) -> Path:
@@ -410,7 +444,7 @@ class Music(Kinetic):
             if must_exist and not path.is_file():
                 raise JobError(f"There's no {what} at {rel}.")
             return path
-        if by not in PICTURE_BY:
+        if not picture_maker(by):
             raise JobError("This video's pictures aren't made by the app: make them as the Pictures notes say.")
         out = inside(req.get("out"), "output", must_exist=False)
         if out.suffix.lower() not in (".png", ".jpg", ".jpeg"):
@@ -426,22 +460,30 @@ class Music(Kinetic):
         if by == "openai":
             made.write_bytes(await self.writers.providers["openai"].picture(text, shape=shape, references=refs))
             said = {"by": "ChatGPT"}
+        elif by == "grok":
+            data, _ = await grok_media.picture(self.writers.providers["grok"], text, shape, refs[:3],
+                                               model=use.get("model") or "grok-imagine-image-2.0")
+            await asyncio.to_thread(lambda: Image.open(io.BytesIO(data)).convert("RGB").save(made))
+            said = {"by": "Grok Imagine"}
         else:
+            m = localpics.of(by)
             await ctx.sched.free_gpu()
-            width, height = PICTURE_SIZES[shape]
+            width, height = m.size(shape)
+            names = [await ctx.comfy.upload(r, subfolder=f"sv-music-{pid}") for r in refs[:m.refs]] if m.refs else []
 
             def on(ev: dict) -> None:
                 if ev["type"] == "queued":
                     ctx.prompt_id = ev["prompt_id"]
             try:
-                res = await ctx.comfy.run(krea_graph(text, width, height, random.randrange(2**31), f"sv/{pid}/picture-{rid}"), on)
+                res = await ctx.comfy.run(m.graph(text, width, height, random.randrange(2**31), f"sv/{pid}/picture-{rid}",
+                                                  refs=names), on)
             finally:
                 ctx.prompt_id = None
-            files = res.files("10", "images")
+            files = res.files(m.out, "images")
             if not files:
-                raise JobError("Krea 2 finished without a picture.")
+                raise JobError(f"{m.name} finished without a picture.")
             await ctx.comfy.download(files[0], made)
-            said = {"by": "Krea 2", **({"note": "Krea 2 takes no references: they weren't used."} if refs else {})}
+            said = {"by": m.name, **({"note": f"{m.name} takes no references: they weren't used."} if refs and not m.refs else {})}
         if out.suffix.lower() == ".png":
             made.replace(out)
         else:
@@ -592,6 +634,49 @@ class Music(Kinetic):
                 await http.post(f"{self.cfg.vrgdg_url}/interrupt")
         except httpx.HTTPError:
             pass
+
+    async def _grok_clip(self, pid: str, work: Path, rid: str, req: dict) -> dict:
+        """One clip from Grok Imagine, asked for the way H3's are (tools/h3.py): 1 to 15 seconds at 720p, the shape the
+        nearest to the size asked, its own sound dropped."""
+        root = work.resolve()
+
+        def inside(rel: object, what: str, must_exist: bool = True) -> Path:
+            path = (root / str(rel or "")).resolve()
+            if root not in path.parents:
+                raise JobError(f"The {what} must be a file in this folder.")
+            if must_exist and not path.is_file():
+                raise JobError(f"There's no {what} at {rel}.")
+            return path
+        image = inside(req.get("image"), "still")
+        end = inside(req["end"], "end still") if req.get("end") else None
+        out = inside(req.get("out"), "output", must_exist=False)
+        if out.suffix.lower() != ".mp4":
+            raise JobError("The output must be an .mp4 file.")
+        seconds = float(req.get("seconds") or 6)
+        if not 1 <= seconds <= 15:
+            raise JobError("A Grok clip can be 1 to 15 seconds.")
+        text = " ".join(str(req.get("prompt") or "").split())
+        if not text or len(text) > 6000:
+            raise JobError("The prompt must be some words (at most 6000 characters).")
+        ratio = int(req.get("width") or SIZE[0]) / max(1, int(req.get("height") or SIZE[1]))
+        shape = min(("16:9", 16 / 9), ("9:16", 9 / 16), ("1:1", 1.0), ("4:3", 4 / 3), ("3:4", 3 / 4),
+                    key=lambda x: abs(math.log(x[1] / ratio)))[0]
+        self.film_changed(pid, message=f"Grok is animating {out.relative_to(root)}")
+        try:
+            data, suffix = await grok_media.clip(self.writers.providers["grok"], image, text, round(seconds), end, shape)
+        except WriterError as exc:
+            raise JobError(f"Grok didn't make the clip: {exc}") from None
+        out.parent.mkdir(parents=True, exist_ok=True)
+        raw = out.with_suffix(f".grok{suffix}")
+        raw.write_bytes(data)
+        try:  # only the moving picture: Grok's file also carries its own sound and a still
+            await _exec([self.cfg.ffmpeg, "-v", "error", "-y", "-i", str(raw), "-map", "0:v:0", "-an", "-c", "copy",
+                         "-movflags", "+faststart", str(out)], timeout=120)
+        finally:
+            raw.unlink(missing_ok=True)
+        if not out.is_file():
+            raise JobError("Grok's clip couldn't be saved.")
+        return {"out": str(out.relative_to(root)), "seconds": round(seconds), "shape": shape, "by": "Grok Imagine"}
 
     async def _render(self, ctx: Context, pid: str, work: Path, rid: str, req: dict) -> dict:
         root = work.resolve()

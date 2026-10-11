@@ -12,6 +12,7 @@ Ported from the old app's title look (web/src/render/album.ts, titlelook.ts) and
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import os
@@ -25,7 +26,9 @@ import httpx
 from PIL import Image
 
 from . import look as look_mod, net
+from . import localpics
 from .catalog import choice_words, summary
+from .writers import grok_media
 from .config import ROOT
 from .paths import under
 from .jobs import Context, JobError, Scheduler
@@ -34,7 +37,8 @@ from .writers import Writers, WriterError
 log = logging.getLogger("sv.covers")
 SIZE = 3000
 SMALL = 640
-KINDS = {"mitte": "cover.mitte", "openai": "cover.openai", "local": "cover.local"}  # anything else ("mcp:<id>"): cover.mcp
+KINDS = {"mitte": "cover.mitte", "openai": "cover.openai", "grok": "cover.grok", "local": "cover.local"}
+# ("local:<model>": cover.local too; anything else, "mcp:<id>": cover.mcp)
 MITTE_TOOLS = ["mcp__claude_ai_Mitte__run_node", "mcp__claude_ai_Mitte__get_task", "mcp__claude_ai_Mitte__get_node_run"]
 MITTE_INPUT = {"quality": "high", "size": "2K", "aspect_ratio": "1:1", "num_images": 1, "speed": "flare", "output_format": "png"}
 MITTE_COST = 0.071  # USD, high at 2K, one picture (Mitte's price list, 2026-10)
@@ -42,8 +46,6 @@ MITTE_TRIES, MITTE_WAIT = 4, (5, 15, 40)  # when Mitte isn't connected yet: try 
 NOT_CONNECTED = re.compile(r"tools? (are|is) not available|not available in this session|still connecting|"
                            r"no (run_node|mitte) tool|not (been )?announced", re.I)
 FONTS_DIR = Path(os.environ.get("SV_DATA") or ROOT / "data") / "fonts"  # (the Covers below pass the app's own)
-LOCAL = {"unet": "krea2_turbo_fp8_scaled.safetensors", "clip": "qwen3vl_4b_fp8_scaled.safetensors", "clip_type": "krea2",
-         "vae": "wan_2.1_vae.safetensors", "steps": 8, "shift": 3.0, "size": 1280}
 STYLE_TAIL = " Square album cover art. No text, no letters, no logos, no watermark, no border."
 
 
@@ -109,16 +111,21 @@ class Covers:
         """Your artist name (Brand): on every song that has no artist of its own."""
         return self.settings()["artist"]
 
-    def settings(self) -> dict:
+    def settings(self, statuses: dict[str, dict] | None = None) -> dict:
+        """The covers' settings and the choices for pictures and clips; with `statuses` (the sign-ins), each choice says
+        whether it's connected, so the interface offers only what works."""
         s = self.app.store.setting("covers") or {}
-        choices = self.writers.image_choices()
+        choices = self.writers.image_choices(statuses)
         ids = [c["id"] for c in choices]
+        covers = next((c for c in choices if c["id"] == self.writers.picture_by("covers")), {})
         return {"engine": self.writers.picture_by("covers"), "artist": s.get("artist") or "",  # Settings → Pictures
-                # a cover with every song made from the Home prompt: GPT Image 2.5 through Mitte, as the user asked
-                # (2026-10-09), unless they pick the local one or none
-                "auto": s.get("auto") if s.get("auto") in (*ids, "off") else self.writers.picture_by("covers"),
+                # a cover with every song made from the Home prompt ("on" unless turned off), made as Settings says for
+                # album covers: not when that may cost money (each paid job is asked about first)
+                "auto": "off" if s.get("auto") == "off" else "on", "autoPaid": bool(covers.get("paid")),
+                # exactly what Settings has chosen for each, in words (the interface shows it, nothing else)
+                "madeWith": {role: self.writers.made_with(role) for role in ("covers", "scenes", "motion")},
                 "choices": choices, "scenes": self.writers.picture_by("scenes"),  # (for the music video form)
-                "motion": self.writers.motion_by(), "motionChoices": self.writers.motion_choices(),
+                "motion": self.writers.motion_by(), "motionChoices": self.writers.motion_choices(statuses),
                 # the model and settings chosen on an MCP server, for the "may charge your account" question
                 "using": {role: self.writers.using(role) for role in ("covers", "scenes", "motion")}}
 
@@ -127,12 +134,18 @@ class Covers:
         ids = self.writers.image_ids()
         if engine in ids and engine != self.writers.picture_by("covers"):  # (the same one keeps its model and settings)
             self.writers.set_who("covers", [{"provider": engine}])
-        if auto in (*ids, "off"):
-            s["auto"] = auto
+        if auto in (*ids, "on", "off"):
+            s["auto"] = "off" if auto == "off" else "on"
         if artist is not None:
             s["artist"] = artist.strip()[:60]
         self.app.store.set_setting("covers", s)
         return self.settings()
+
+    def auto_engine(self) -> str | None:
+        """What a song from the Home prompt gets its cover from: the album covers' choice in Settings, unless covers
+        with every song are off, or that choice may cost money."""
+        s = self.settings()
+        return None if s["auto"] == "off" or s["autoPaid"] else s["engine"]
 
     def start(self, pid: str, engine: str | None = None, note: str = "", prompt: str = "", moving: bool = False,
               for_living: bool = False, auto: bool = False, by: dict | None = None, concept: str = "") -> dict:
@@ -140,7 +153,8 @@ class Covers:
         living cover's picture as soon as it's made; `auto`: painted for "Let Claude make it", which carries on
         when it's done."""
         engine = engine if engine in self.writers.image_ids() else self.writers.picture_by("covers")
-        return self.app.sched.submit(KINDS.get(engine, "cover.mcp"), {"message": "Imagining the picture" if moving else "Imagining the cover",
+        kind = "cover.local" if engine.startswith("local:") else KINDS.get(engine, "cover.mcp")
+        return self.app.sched.submit(kind, {"message": "Imagining the picture" if moving else "Imagining the cover",
                                             "engine": engine, "note": note[:600], "prompt": prompt[:1400], "moving": moving,
                                             "forLiving": for_living, "auto": auto, "promptBy": by, "concept": concept[:300]}, pid)
 
@@ -304,25 +318,39 @@ class Covers:
             dest.write_bytes(await self.writers.providers["openai"].picture(prompt + STYLE_TAIL, shape="1:1"))
         except WriterError as exc:
             raise JobError(f"ChatGPT didn't make the picture: {exc}") from None
-        return {"engine": "openai", "model": "ChatGPT", "cost": 0}
+        return {"engine": "openai", "model": "GPT Image 2 (ChatGPT)", "cost": 0}
+
+    async def _grok(self, ctx: Context, prompt: str, dest: Path) -> dict:
+        """Grok Imagine, under the person's Grok plan (Sign in with Grok, in Settings)."""
+        ctx.update(stage="paint", message="Grok Imagine is painting it", progress=0.3)
+        model = self.writers.grok_model("covers")
+        try:
+            data, _ = await grok_media.picture(self.writers.providers["grok"], prompt + STYLE_TAIL, "1:1", model=model)
+        except WriterError as exc:
+            raise JobError(f"Grok didn't make the picture: {exc}") from None
+        await asyncio.to_thread(lambda: Image.open(io.BytesIO(data)).convert("RGB").save(dest))
+        return {"engine": "grok", "model": self.writers.using("covers") or model, "cost": 0}
 
     async def _local(self, ctx: Context, prompt: str, dest: Path) -> dict:
+        """One of the image models on this machine's GPU (sv/localpics.py): Krea 2 unless the choice names another."""
+        m = localpics.of(str(ctx.job.get("engine") or "local"))
         seed = random.randrange(2**31)
-        graph = krea_graph(prompt + STYLE_TAIL, LOCAL["size"], LOCAL["size"], seed, "sv/cover")
-        ctx.update(stage="paint", message="Krea 2 is painting it", progress=0.3)
+        side = m.size("1:1")
+        graph = m.graph(prompt + STYLE_TAIL, side[0], side[1], seed, "sv/cover")
+        ctx.update(stage="paint", message=f"{m.name} is painting it", progress=0.3)
 
         def follow(ev: dict) -> None:
             if ev["type"] == "queued":
                 ctx.prompt_id = ev["prompt_id"]
-            elif ev["type"] == "progress" and ev.get("max") and ev.get("node") == "8":
+            elif ev["type"] == "progress" and ev.get("max") and ev.get("node") == m.sampler:
                 ctx.update(progress=0.3 + 0.6 * ev["value"] / ev["max"])
 
         result = await ctx.comfy.run(graph, follow)
-        files = result.files("10", "images")
+        files = result.files(m.out, "images")
         if not files:
-            raise JobError("Krea 2 didn't return a picture.")
+            raise JobError(f"{m.name} didn't return a picture.")
         await ctx.comfy.download(files[0], dest)
-        return {"engine": "local", "model": "Krea 2 Turbo", "seed": seed, "cost": 0}
+        return {"engine": m.engine, "model": f"{m.name} Turbo", "seed": seed, "cost": 0}
 
     async def _upscale(self, ctx: Context, art: Path) -> Path:
         """Pictures come back at 1-1.5K; the sleeve is 3000 px. A 4x model (as the old app used) brings out real
@@ -372,7 +400,8 @@ class Covers:
         else:
             ctx.update(stage="imagine", message="Imagining the picture", progress=0.05)
             prompt, by = await self._prompt(ctx, p)
-            paint = {"cover.mitte": self._mitte, "cover.openai": self._openai, "cover.mcp": self._mcp}.get(ctx.job["kind"], self._local)
+            paint = {"cover.mitte": self._mitte, "cover.openai": self._openai, "cover.grok": self._grok,
+                     "cover.mcp": self._mcp}.get(ctx.job["kind"], self._local)
             made = await paint(ctx, prompt, art)
             made["moving"] = bool(ctx.job.get("moving"))
         art = await self._upscale(ctx, art)
@@ -446,23 +475,7 @@ async def fetch_picture(url: str, dest: Path) -> None:
     dest.write_bytes(res.content)
 
 
-def krea_graph(prompt: str, width: int, height: int, seed: int, prefix: str) -> dict:
-    """Krea 2 Turbo on our ComfyUI: one picture. The sampler is node 8, the picture comes out of node 10."""
-    L = LOCAL
-    return {
-        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": L["unet"], "weight_dtype": "default"}},
-        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": L["clip"], "type": L["clip_type"], "device": "default"}},
-        "3": {"class_type": "VAELoader", "inputs": {"vae_name": L["vae"]}},
-        "4": {"class_type": "ModelSamplingAuraFlow", "inputs": {"model": ["1", 0], "shift": L["shift"]}},
-        "5": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": prompt}},
-        "6": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["5", 0]}},
-        "7": {"class_type": "EmptyLatentImage", "inputs": {"width": width, "height": height, "batch_size": 1}},
-        "8": {"class_type": "KSampler", "inputs": {"model": ["4", 0], "positive": ["5", 0], "negative": ["6", 0],
-                                                   "latent_image": ["7", 0], "seed": seed, "steps": L["steps"], "cfg": 1.0,
-                                                   "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0}},
-        "9": {"class_type": "VAEDecode", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
-        "10": {"class_type": "SaveImage", "inputs": {"images": ["9", 0], "filename_prefix": prefix}},
-    }
+krea_graph = localpics.krea_graph  # (moved to sv/localpics.py)
 
 
 def living_picture(living: dict | None, n: int) -> dict:
@@ -483,6 +496,7 @@ def register(sched: Scheduler, app, writers: Writers) -> Covers:
     run.after = after  # type: ignore[attr-defined]
     sched.register("cover.mitte", "net", run)
     sched.register("cover.openai", "net", run)
+    sched.register("cover.grok", "net", run)
     sched.register("cover.mcp", "net", run)
     sched.register("cover.local", "gpu", run)
     sched.register("cover.upload", "gpu", run)  # (the 4x upscale runs on our ComfyUI)

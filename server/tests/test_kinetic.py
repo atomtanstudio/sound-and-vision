@@ -88,17 +88,17 @@ def test_pictures_come_from_the_gpu_unless_chosen_and_mitte_only_where_it_is_tur
     w.set_who("covers", [{"provider": "mitte"}])  # not offered here: ignored
     assert w.picture_by("covers") == "local"
     w.mitte = True
-    assert w.picture_by("scenes") == "mitte"  # where it's on, it's the default, as it always was there
+    assert w.picture_by("scenes") == "local"  # even where it's on: the owner's Mitte is an MCP server of theirs now
     w.set_who("covers", [{"provider": "mitte"}])
-    assert w.picture_by("covers") == "mitte"
+    assert w.picture_by("covers") == "mitte"  # (still there for an install that chose it)
     w.mcp = types.SimpleNamespace(listed=lambda: [{"id": "abc", "name": "Pics", "ok": True, "paid": True}])
     w.set_who("scenes", [{"provider": "mcp:abc"}])
     assert w.picture_by("scenes") == "mcp:abc"
     assert next(c for c in w.image_choices() if c["id"] == "mcp:abc")["paid"] is True
     w.mcp = types.SimpleNamespace(listed=lambda: [])  # the server was removed: back to the default
-    assert w.picture_by("scenes") == "mitte"
-    w.mitte = False
     assert w.picture_by("scenes") == "local"
+    w.mitte = False
+    assert w.picture_by("covers") == "local"
 
 
 def test_the_interface_names_a_model_only_once_it_is_connected():

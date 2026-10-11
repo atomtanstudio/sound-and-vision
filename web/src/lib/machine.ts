@@ -1,4 +1,4 @@
-/** What the interface calls the machine Sound / Vision runs on: SV_MACHINE on the server ("Legion"), or "the server".
+/** What the interface calls the machine Sound / Vision runs on: SV_MACHINE on the server, else its own hostname.
  *  Set once from /api/health before the app first draws. */
 let name = "the server";
 

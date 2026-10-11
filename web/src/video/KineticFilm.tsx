@@ -11,7 +11,7 @@ import { ThumbMaker } from "../library/ThumbMaker";
 import "../library/library.css";
 import "../shell/bring.css";
 import { machine } from "../lib/machine";
-import { okToSpend, type PictureChoice, type Using } from "../lib/pictures";
+import { okToSpend, onSettingsChanged, type PictureChoice, type Using } from "../lib/pictures";
 import { Doer, doer, useWho } from "../state/who";
 
 const SHAPE = { wide: "16:9", story: "9:16", square: "Square" } as const;
@@ -259,15 +259,20 @@ function MusicStartForm({ project, busy, onStart, onCancel }: {
   const [pictures, setPictures] = useState<PictureChoice | undefined>();
   const [clips, setClips] = useState<PictureChoice | undefined>();
   const [using, setUsing] = useState<Using>({}); // the model and settings chosen on an MCP server, by role
-  useEffect(() => {
-    void api.get<{ scenes: string; choices: PictureChoice[]; motion: string; motionChoices: PictureChoice[]; using?: Using }>("/api/covers/settings")
+  const [madeWith, setMadeWith] = useState<Using>({}); // exactly what Settings chose, in words
+  useEffect(() => {  // (read again whenever Settings closes)
+    const read = () => void api.get<{ scenes: string; choices: PictureChoice[]; motion: string; motionChoices: PictureChoice[];
+                                       using?: Using; madeWith?: Using }>("/api/covers/settings")
       .then((s) => {
         setPictures(s.choices.find((c) => c.id === s.scenes));
         setClips(s.motionChoices.find((c) => c.id === s.motion));
         setUsing(s.using ?? {});
+        setMadeWith(s.madeWith ?? {});
       }).catch(() => undefined);
+    read();
+    return onSettingsChanged(read);
   }, []);
-  const named = (c: PictureChoice | undefined, use: string | undefined) => (c ? (use ? `${c.name} (${use})` : c.name) : undefined);
+  const named = (c: PictureChoice | undefined, role: "scenes" | "motion") => madeWith[role] || c?.name;
   const [first, setFirst] = useState<"opening" | "part" | "whole">("opening");
   const parts = useParts(project.id);
   const [partAt, setPartAt] = useState(0);
@@ -294,8 +299,8 @@ function MusicStartForm({ project, busy, onStart, onCancel }: {
         <h3>Music Video</h3>
         {onCancel && <Button size="sm" kind="ghost" onClick={onCancel}>Back to the video</Button>}
       </div>
-      <p className="la-lead">{Doer(roles, "film", "The director")} directs a music video for the whole song: it makes the pictures with {named(pictures, using.scenes) ?? "the source in Settings"},
-        brings them to life with {singing ? `MiniMax H3 on ${machine()}` : named(clips, using.motion) ?? `MiniMax H3 on ${machine()}`}, and cuts and finishes it to the music.{singing ? " The singing goes through VRGameDevGirl's Video Builder, with the song locked into each scene so the mouths follow the real vocal." : ""}</p>
+      <p className="la-lead">{Doer(roles, "film", "The director")} directs a music video for the whole song: it makes the pictures with {named(pictures, "scenes") ?? "the source in Settings"},
+        brings them to life with {singing ? `MiniMax H3 on ${machine()}` : named(clips, "motion") ?? `MiniMax H3 on ${machine()}`}, and cuts and finishes it to the music.{singing ? " The singing goes through VRGameDevGirl's Video Builder, with the song locked into each scene so the mouths follow the real vocal." : ""}</p>
       <div className="mv-kinds" role="radiogroup" aria-label="Kind of music video">
         {MV_KINDS.map((k) => (
           <button key={k.id} type="button" role="radio" aria-checked={k.id === kind}

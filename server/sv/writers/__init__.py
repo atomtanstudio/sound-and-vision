@@ -1,6 +1,5 @@
 """Who does what: each kind of work goes to the provider and model the user chose for it, falling
-down the list when that one isn't connected. Defaults (the user, 2026-10-09): no Grok for now;
-Claude Haiku 5.5 writes lyrics and reads the Home prompt; Claude Opus directs videos. A Claude or ChatGPT step can
+down the list when that one isn't connected. Defaults (the user, 2026-10-09): Claude Haiku 5.5 writes lyrics and reads the Home prompt; Claude Opus directs videos. A Claude or ChatGPT step can
 carry its reasoning level ("effort": none means the model's own default; Claude's are low … max, ChatGPT's are the ones
 each model lists). "film" is the long Claude Code session that makes a video in code (a living cover's finish, a
 Motion Graphics film, a music video); only Claude does it.
@@ -16,6 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .. import localpics
 from ..catalog import Catalogs, clean_choice, summary
 from ..config import Config
 from ..mcp import Servers
@@ -41,6 +41,18 @@ IMAGE_ROLES = {"covers": "Album covers", "scenes": "Pictures for music videos"}
 IMAGE_DEFAULTS = {"covers": [{"provider": "local"}], "scenes": [{"provider": "local"}]}
 MOTION_ROLES = {"motion": "Animating scenes (Surreal music videos)"}
 MITTE_COST = 0.071  # USD a picture (GPT Image 2.5, high, 2K: Mitte's price list, 2026-10)
+# Grok Imagine's models, as xAI lists them (docs.x.ai/docs/models, 2026-10-11). The Grok CLI takes the picture model
+# from GROK_IMAGE_GEN_MODEL_OVERRIDE; its video tool always uses grok-imagine-video-1.5 (CLI 1.0.41).
+GROK_IMAGE_DEFAULT = "grok-imagine-image-2.0"  # the user, 2026-10-11
+PROVIDER_MODELS = {"grok": {
+    "image": [{"id": "grok-imagine-image-2.0", "name": "Grok Imagine Image 2.0", "options": [],
+               "note": "xAI's newest picture model: crisp short text, and up to three reference pictures."},
+              {"id": "grok-imagine-image-quality", "name": "Grok Imagine Image Quality", "options": [],
+               "note": "Its highest-fidelity model: more detail and finer control."},
+              {"id": "grok-imagine-image", "name": "Grok Imagine Image", "options": [],
+               "note": "The standard model: the quickest."}],
+    "video": [{"id": "grok-imagine-video-1.5", "name": "Grok Imagine Video 1.5", "options": [],
+               "note": "xAI's newest video model, from a still picture."}]}}
 ROLE_LABELS = {"interpret": "Reading the Home prompt", "lyrics": "Lyrics, titles and rewrites",
                "research": "Researching a sound for the Influence Engine", "direct": "Directing videos", "chores": "Small chores (cover prompts, labels)",
                "film": "Making videos in code (Motion Graphics, living cover finishes)"}
@@ -60,11 +72,12 @@ class Writers:
         self.mcp = Servers(cfg.data / "secrets" / "mcp.json")
         self.catalogs = Catalogs(cfg.data / "mcp-catalogs")
         self.on_mcp = None  # called when a catalog has been read (the app tells the interface)
+        self.comfy = None  # our ComfyUI (set by the app): which local image models it has
+        self.local = localpics.Available()
 
     def who(self) -> dict[str, list[dict]]:
-        # settings saved before 2026-10-09 put Grok first; the user asked for no Grok for now, so those are dropped
         saved = {k: v for k, v in (self.store.setting("who") or {}).items() if (k in DEFAULT_WHO or k in IMAGE_ROLES or k in MOTION_ROLES)
-                 and v and not any(step.get("provider") == "grok" for step in v)}
+                 and v}
         images = self.image_defaults()
         old = (self.store.setting("covers") or {}).get("engine")  # the covers' own switch, before covers had a role
         if old:
@@ -79,7 +92,7 @@ class Writers:
         return who
 
     def motion_ids(self) -> list[str]:
-        return ["local", *(["mitte"] if self.mitte else []), *(f"mcp:{s['id']}" for s in self.mcp.listed())]
+        return ["local", "grok", *(["mitte"] if self.mitte else []), *(f"mcp:{s['id']}" for s in self.mcp.listed())]
 
     def motion_by(self) -> str:
         """Who animates the scenes of a Surreal music video (one of motion_ids())."""
@@ -89,8 +102,12 @@ class Writers:
         """What can turn stills into clips, as image_choices() lists pictures."""
         st = statuses or {}
         out = [{"id": "local", "name": f"MiniMax H3 on {self.machine}", "cost": 0, "paid": False, **({"connected": True} if st else {}),
-                "note": "On your GPU: free, about 90 seconds a clip."}]
-        if self.mitte:
+                "note": "On your GPU: free, about 90 seconds a clip."},
+               {"id": "grok", "name": "Grok Imagine", "cost": 0, "paid": False,
+                **({"connected": bool(st["grok"].get("connected"))} if "grok" in st else {}),
+                "note": "On your Grok plan (it needs SuperGrok): about 40 seconds a clip, up to 15 seconds long, at 720p."}]
+        if self.mitte and self.who().get("motion", [{}])[0].get("provider") == "mitte":  # (only while it's still chosen:
+            # the owner's Mitte is an MCP server now, so it isn't offered twice)
             out.append({"id": "mitte", "name": "H3 Max (Mitte)", "cost": 0.2, "paid": True,
                         **({"connected": bool(st["claude"].get("connected"))} if "claude" in st else {}),
                         "note": "Hosted H3 through Mitte: much faster; about 20¢ a 5-second clip at 768p (13¢ at 480p)."})
@@ -102,18 +119,21 @@ class Writers:
         return out
 
     def image_defaults(self) -> dict[str, list[dict]]:
-        """The GPU's Krea 2; where the owner turned their Mitte on, that (as it always was there)."""
-        return {role: [{"provider": "mitte"}] for role in IMAGE_ROLES} if self.mitte else dict(IMAGE_DEFAULTS)
+        """The GPU's Krea 2, until the person chooses (the owner's Mitte is one of their MCP servers now)."""
+        return {role: list(steps) for role, steps in IMAGE_DEFAULTS.items()}
 
     def image_ids(self) -> list[str]:
-        return ["openai", "local", *(["mitte"] if self.mitte else []), *(f"mcp:{s['id']}" for s in self.mcp.listed())]
+        return ["openai", "grok", *localpics.engines(), *(["mitte"] if self.mitte else []),
+                *(f"mcp:{s['id']}" for s in self.mcp.listed())]
 
     def set_who(self, role: str, chain: list[dict]) -> None:
         cur = self.store.setting("who") or {}
         if role in IMAGE_ROLES or role in MOTION_ROLES:
             ids = self.image_ids() if role in IMAGE_ROLES else self.motion_ids()
+            grok = [m["id"] for m in PROVIDER_MODELS["grok"]["image"]] if role in IMAGE_ROLES else []
             cur[role] = [{"provider": c["provider"],
-                          **(clean_choice(c.get("model"), c.get("options")) if c["provider"].startswith("mcp:") else {})}
+                          **(clean_choice(c.get("model"), c.get("options")) if c["provider"].startswith("mcp:") else
+                             {"model": c["model"]} if c["provider"] == "grok" and c.get("model") in grok else {})}
                          for c in chain if c.get("provider") in ids][:1]
         elif role in DEFAULT_WHO:
             cur[role] = [{"provider": c["provider"], "model": c.get("model"),
@@ -129,12 +149,34 @@ class Writers:
         return (self.who().get(role) or [{}])[0]
 
     def using(self, role: str) -> str:
-        """For a picture or clip role on an MCP server, the model and settings chosen there, short ("" for its default)."""
+        """For a picture or clip role on an MCP server or Grok, the model (and settings) chosen there, short ("" for an
+        MCP server's own default)."""
         step = self.step(role)
         provider = str(step.get("provider") or "")
+        kind = "video" if role in MOTION_ROLES else "image"
+        if provider == "grok":
+            mid = step.get("model") or (GROK_IMAGE_DEFAULT if kind == "image" else "grok-imagine-video-1.5")
+            return next((m["name"] for m in PROVIDER_MODELS["grok"][kind] if m["id"] == mid), mid)
         if not provider.startswith("mcp:"):
             return ""
-        return summary(self.catalogs, provider.removeprefix("mcp:"), "video" if role in MOTION_ROLES else "image", step)
+        return summary(self.catalogs, provider.removeprefix("mcp:"), kind, step)
+
+    def made_with(self, role: str) -> str:
+        """Exactly what Settings has chosen for a picture or clip role, in words: "ImagineArt · GPT Image 2.5, 2K",
+        "Grok Imagine Image 2.0", "Krea 2 on Legion"."""
+        step = self.step(role)
+        provider = str(step.get("provider") or "local")
+        choices = self.motion_choices() if role in MOTION_ROLES else self.image_choices()
+        name = next((c["name"] for c in choices if c["id"] == provider), provider)
+        use = self.using(role)
+        if provider == "grok":
+            return use or name
+        return f"{name} · {use}" if use else name
+
+    def grok_model(self, role: str) -> str:
+        """The Grok Imagine picture model for a role (its default when none was chosen)."""
+        step = self.step(role)
+        return step.get("model") if step.get("provider") == "grok" and step.get("model") else GROK_IMAGE_DEFAULT
 
     async def read_models_once(self, sid: str) -> None:
         """A server that answers gets its catalog read by itself, once (when it's added, signed in to or checked), if
@@ -161,12 +203,18 @@ class Writers:
         def on(pid: str) -> dict:
             return {"connected": bool(st[pid].get("connected"))} if pid in st else {}
         out = [
-            {"id": "openai", "name": "ChatGPT", "cost": 0, "paid": False, **on("openai"),
+            {"id": "openai", "name": "GPT Image 2 (ChatGPT)", "cost": 0, "paid": False, **on("openai"),
              "note": "ChatGPT's own image tool, on your ChatGPT plan." + ("" if st.get("openai", {}).get("connected", True) else " Sign in above.")},
-            {"id": "local", "name": f"Krea 2 on {self.machine}", "cost": 0, "paid": False, **({"connected": True} if st else {}),
-             "note": "On your GPU: free, and waits its turn behind songs."},
+            {"id": "grok", "name": "Grok Imagine", "cost": 0, "paid": False, **on("grok"),
+             "note": "Grok Imagine, on your Grok plan (it needs SuperGrok)."},
+            # every image model on this machine's GPU whose files our ComfyUI has (sv/localpics.py)
+            *({"id": m.engine, "name": f"{m.name} on {self.machine}", "cost": 0, "paid": False,
+               **({"connected": m.key in self.local.keys} if st else {}),
+               "note": "On your GPU: free, and waits its turn behind songs." +
+                       (" It keeps people and places the same from reference pictures." if m.refs else "")}
+              for m in localpics.MODELS.values()),
         ]
-        if self.mitte:
+        if self.mitte and any(self.who().get(r, [{}])[0].get("provider") == "mitte" for r in IMAGE_ROLES):  # (as above)
             out.append({"id": "mitte", "name": "GPT Image 2.5 (Mitte)", "cost": MITTE_COST, "paid": False, **on("claude"),
                         "note": "Through Mitte on your Claude account; about 7¢ a picture."})
         for s in self.mcp.listed():
@@ -176,11 +224,17 @@ class Writers:
                                 (" It may charge your account, so you're asked first." if s.get("paid") else "")})
         return out
 
+    async def statuses(self) -> dict[str, dict]:
+        """Each provider's sign-in, as it stands (what the picture and clip choices are marked connected by)."""
+        await self.local.check(self.comfy)  # (which local image models are there, at most once a minute)
+        return {k: await p.status() for k, p in self.providers.items()}
+
     async def connections(self) -> dict[str, Any]:
-        statuses = {k: await p.status() for k, p in self.providers.items()}
+        statuses = await self.statuses()
         return {"providers": list(statuses.values()), "who": self.who(), "roles": ROLE_LABELS, "efforts": list(EFFORTS),
                 "filmModels": FILM_MODELS, "imageRoles": IMAGE_ROLES, "imageProviders": self.image_choices(statuses),
-                "motionRoles": MOTION_ROLES, "motionProviders": self.motion_choices(statuses), "mcp": self.mcp_listed()}
+                "motionRoles": MOTION_ROLES, "motionProviders": self.motion_choices(statuses), "mcp": self.mcp_listed(),
+                "providerModels": PROVIDER_MODELS}
 
     async def doers(self) -> dict[str, Any]:
         """Who does each job right now, for the interface's wording: the first connected step of each role's chain

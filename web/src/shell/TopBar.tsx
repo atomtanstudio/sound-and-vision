@@ -5,6 +5,7 @@ import { linkTo, usePath } from "../lib/router";
 import { useLine } from "../state/events";
 import { ThemeToggle } from "../ui/ThemeToggle";
 import { Settings } from "./Settings";
+import { settingsChanged } from "../lib/pictures";
 import "./topbar.css";
 import { Machine, machine } from "../lib/machine";
 import { useWho } from "../state/who";
@@ -83,6 +84,11 @@ export function TopBar() {
   const path = usePath();
   const { h, down } = useHealth();
   const [settings, setSettings] = useState(false);
+  useEffect(() => {  // "Change in Settings", from a panel that shows a choice made there
+    const show = () => setSettings(true);
+    window.addEventListener("sv-open-settings", show);
+    return () => window.removeEventListener("sv-open-settings", show);
+  }, []);
   const [open, setOpen] = useState(false);
   const line = useLine((s) => s.state);
   const unreachable = down || line === "lost";
@@ -153,7 +159,7 @@ export function TopBar() {
           </svg>
         </button>
       </div>
-      {settings && <Settings onClose={() => { setSettings(false); void useWho.getState().load(); }} />}
+      {settings && <Settings onClose={() => { setSettings(false); void useWho.getState().load(); settingsChanged(); }} />}
     </header>
   );
 }
