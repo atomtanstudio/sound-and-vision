@@ -1234,6 +1234,61 @@
   color: var(--text-3);
   font-size: 12.5px;
 }
+.cv-prompt {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.cv-prompt summary {
+  cursor: pointer;
+}
+.cv-prompt summary:hover {
+  color: var(--text);
+}
+.cv-prompt p {
+  margin: 6px 0;
+  color: var(--text-2);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.cv-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-song);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cv-link:hover {
+  text-decoration: underline;
+}
+.cv-earlier div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cv-earlier button {
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #000;
+}
+.cv-earlier button:hover:not(:disabled) {
+  border-color: var(--c-picture);
+}
+.cv-earlier button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.cv-earlier img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 @media (max-width: 760px) {
   .cv-panel {
     grid-template-columns: 1fr;

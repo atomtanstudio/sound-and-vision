@@ -45,6 +45,8 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
   const [settings, setSettings] = useState<CoverSettings | null>(null);
   const [engine, setEngine] = useState("local");
   const [note, setNote] = useState("");
+  const [mine, setMine] = useState(false); // the person writes the prompt, rather than the small-chores model
+  const [own, setOwn] = useState("");
   const [artist, setArtist] = useState(cover?.artist ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,15 +72,23 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
     }
   };
   const chosen = settings?.choices.find((c) => c.id === engine);
-  const make = () =>
+  // a new picture: from a prompt the small-chores model writes (steered by the direction), from the person's own
+  // prompt, or from the same prompt as the cover now ("again")
+  const make = (how: "new" | "mine" | "again") =>
     // (the model and settings from Settings go with the covers' own choice; another one uses its default)
-    okToSpend(chosen, "this picture", engine === settings?.engine ? settings?.using?.covers : "") && run("make", async () => {
+    okToSpend(chosen, "this picture", engine === settings?.engine ? settings?.using?.covers : "") && run(how, async () => {
       if (settings && (engine !== settings.engine || (!cover && artist !== settings.artist))) {
         await api.put("/api/covers/settings", { engine, artist: cover ? undefined : artist });
       }
-      const j = await api.post<Job>(`/api/projects/${project.id}/cover`, { engine, note });
+      const prompt = how === "mine" ? own.trim() : how === "again" ? cover?.prompt ?? "" : "";
+      const j = await api.post<Job>(`/api/projects/${project.id}/cover`, { engine, note: how === "new" ? note : "", prompt });
       useSong.getState().onJob(j);
     });
+  const writeMine = (from: string) => {
+    setMine(true);
+    setOwn(from);
+  };
+  const earlier = (project.covers ?? []).filter((c) => c.n !== cover?.n).slice(-8).reverse();
   const reset = () => run("text", () => api.post(`/api/projects/${project.id}/cover/text`, { artist }));
   const stale = cover && cover.title !== project.title;
 
@@ -119,30 +129,80 @@ function CoverPanel({ job, onClose }: { job?: Job; onClose: () => void }) {
               {looking && <CoverLook project={project} onClose={() => setLooking(false)} />}
               {cover.by?.concept && <p className="cv-note">The idea: {cover.by.concept}</p>}
               <p className="cv-note">Made with {cover.made.model}{cover.made.cost ? ` · about ${Math.round(cover.made.cost * 100)}¢` : ""}.</p>
+              {cover.prompt && (
+                <details className="cv-prompt">
+                  <summary>{cover.by?.provider === "you" ? "Your prompt" : "The prompt it was made from"}</summary>
+                  <p>{cover.prompt}</p>
+                  <button type="button" className="cv-link" onClick={() => writeMine(cover.prompt)}>Change it and make another</button>
+                </details>
+              )}
+            </section>
+          )}
+          {earlier.length > 0 && (
+            <section className="cv-earlier">
+              <h3>Earlier pictures</h3>
+              <div>
+                {earlier.map((c) => (
+                  <button key={c.n} type="button" title={c.by?.concept ?? `Picture ${c.n}`} disabled={!!busy || !!job}
+                    aria-label={`Make picture ${c.n} the cover again`}
+                    onClick={() => void run("use", () => api.post(`/api/projects/${project.id}/cover/use`, { n: c.n }))}>
+                    <img src={`/api/projects/${project.id}/covers/${c.n}/thumb.jpg`} alt="" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+              <p className="cv-note">Click one to make it the cover again.</p>
             </section>
           )}
           <section>
             <h3>{cover ? "A new picture" : "Make the cover"}</h3>
             <Segmented label="Made with" value={engine} onChange={setEngine}
               options={(settings?.choices ?? []).map((c) => ({ value: c.id, label: choiceLabel(c), hint: c.note }))} />
-            <p className="cv-note">
-              {chosen?.note}
-              {" "}{Doer(roles, "chores")} reads the song and imagines the picture; the title{artist ? ", the artist" : ""} and your logos are set on it here.
-            </p>
+            <p className="cv-note">{chosen?.note}</p>
+            <Segmented size="sm" label="The prompt" value={mine ? "mine" : "theirs"}
+              onChange={(v) => (v === "mine" ? writeMine(own || cover?.prompt || "") : setMine(false))}
+              options={[{ value: "theirs", label: `${Doer(roles, "chores")} writes it` }, { value: "mine", label: "I'll write it" }]} />
             {!cover && (
               <label className="cv-field">
                 <span>Artist (optional)</span>
                 <input value={artist} placeholder="Your artist name" onChange={(e) => setArtist(e.target.value)} />
               </label>
             )}
-            <label className="cv-field">
-              <span>Direction (optional)</span>
-              <TextArea minRows={2} value={note} placeholder="“A lone car on a coastal road at dawn”, “risograph, two colors”…"
-                onChange={(e) => setNote(e.target.value)} />
-            </label>
-            <Button kind="primary" busy={busy === "make"} disabled={!!job || !!busy} onClick={() => void make()}>
-              {cover ? "Make a new picture" : "Make the cover"}
-            </Button>
+            {mine ? (
+              <>
+                <label className="cv-field">
+                  <span>Your prompt</span>
+                  <TextArea minRows={4} maxLength={1400} value={own}
+                    placeholder="The picture: what's in it, where, the light, the style…"
+                    onChange={(e) => setOwn(e.target.value)} />
+                </label>
+                <p className="cv-note">Used as you wrote it. The title{artist ? ", the artist" : ""} and your logos are set on it here, so the picture itself needs no words.</p>
+              </>
+            ) : (
+              <>
+                <p className="cv-note">{Doer(roles, "chores")} reads the song and imagines a new picture each time; the title{artist ? ", the artist" : ""} and your logos are set on it here.</p>
+                <label className="cv-field">
+                  <span>Direction (optional)</span>
+                  <TextArea minRows={2} value={note} placeholder="“A lone car on a coastal road at dawn”, “risograph, two colors”…"
+                    onChange={(e) => setNote(e.target.value)} />
+                </label>
+              </>
+            )}
+            <div className="cv-row">
+              {mine ? (
+                <Button kind="primary" busy={busy === "mine"} disabled={!!job || !!busy || !own.trim()} onClick={() => void make("mine")}>
+                  Make it from my prompt
+                </Button>
+              ) : (
+                <Button kind="primary" busy={busy === "new"} disabled={!!job || !!busy} onClick={() => void make("new")}>
+                  {cover ? "Make a new picture" : "Make the cover"}
+                </Button>
+              )}
+              {cover?.prompt && (
+                <Button busy={busy === "again"} disabled={!!job || !!busy} onClick={() => void make("again")}>
+                  Same prompt again
+                </Button>
+              )}
+            </div>
           </section>
           {settings && (
             <section>
