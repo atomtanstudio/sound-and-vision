@@ -6,6 +6,28 @@ on your home network. The music, picture and video models run locally in ComfyUI
 (a local model, or frontier ones under your own accounts) write the lyrics, plan the pictures and direct the videos;
 you choose which does what.
 
+## What the videos look like
+
+<table>
+<tr>
+<td width="50%"><a href="https://www.youtube.com/watch?v=SUE4zNgMdQw"><img src="docs/media/living-album-cover.jpg" alt="Living Album Cover: Low Moon Kiln"></a><br>
+<b>Living Album Cover.</b> "Low Moon Kiln", a song made in Sound / Vision: its cover, gently moving for the whole song.</td>
+<td width="50%"><a href="https://www.youtube.com/watch?v=VZnI9YuJ8z0"><img src="docs/media/surreal.jpg" alt="Surreal music video: Radiohead, Pyramid Song"></a><br>
+<b>Surreal music video.</b> Radiohead, "Pyramid Song": no story and no lyrics, just pictures that turn into one another.</td>
+</tr>
+<tr>
+<td width="50%"><a href="https://www.youtube.com/watch?v=yA-LakkVImQ"><img src="docs/media/motion-graphics.jpg" alt="Motion Graphics: Propellerheads, On Her Majesty's Secret Service"></a><br>
+<b>Motion Graphics.</b> Propellerheads, "On Her Majesty's Secret Service": a film written in code, cut to the song's timing.</td>
+<td width="50%"><a href="https://www.youtube.com/watch?v=huqNXY5ZfZs"><img src="docs/media/hybrid.jpg" alt="Hybrid music video: Dub Pistols, Rapture"></a><br>
+<b>Hybrid music video.</b> Dub Pistols (feat. Terry Hall), "Rapture": a story, with the singing lip-synced to the real vocal.</td>
+</tr>
+</table>
+
+Each picture opens the video on YouTube. The Motion Graphics and Hybrid films were made with the methods those kinds
+run, just before they were built into the app.
+
+## What it does
+
 - **Music.** Songs from your lyrics and a style, with YuE2 (the default), ACE-Step 1.5 or MiniMax Music 3. Several
   takes, covers of a song (YuE2), new versions of a few bars (ACE-Step), or your own uploaded songs. Every song is
   analysed: stems, beats and sections, and its words timed.
