@@ -94,3 +94,192 @@ def test_share_names_that_smbclient_would_run_are_never_put_in_a_command():
     share = Share("//nas/storage", "Music")
     with pytest.raises(JobError):
         asyncio.run(share.fetch('Music/Bad";!cmd/x.flac', Path("/tmp/x")))
+
+
+# ---- a song finder (an add-on's) ---------------------------------------------------------------------------
+
+import copy
+import types
+
+
+class _Store:
+    def __init__(self, run):
+        self.runs = {run["id"]: copy.deepcopy(run)}
+
+    def run(self, rid):
+        return copy.deepcopy(self.runs.get(rid))
+
+    def update_run(self, rid, status=None, **fields):
+        r = self.runs[rid]
+        if status:
+            r["status"] = status
+        r.update(copy.deepcopy(fields))
+        return copy.deepcopy(r)
+
+
+class _Ctx:
+    def __init__(self, store, rid):
+        self.job, self.store, self.said, self.queued = {"runId": rid}, store, [], []
+        self.sched = types.SimpleNamespace(submit=lambda kind, payload: self.queued.append(kind) or {"id": "j2"})
+
+    def update(self, stage=None, message=None, progress=None):
+        self.said.append(message)
+
+
+class _Finder:
+    name = "Tape Deck"
+
+    def __init__(self, has, fails=(), others=()):
+        self.has, self.fails, self.asked, self.others = has, set(fails), None, list(others)
+
+    async def instead(self, artist, have, count):
+        return [{"title": t, "seconds": 210} for t in self.others if t not in have][:count]
+
+    async def look(self, songs):
+        self.asked = songs
+        return {s["id"]: {"title": s["title"].upper(), "seconds": 200} for s in songs if s["title"] in self.has}
+
+    async def get(self, songs, music, tell):
+        for s in songs:
+            tell(s["id"], state="downloading")
+            if s["title"] in self.fails:
+                tell(s["id"], state="failed", note="It wasn't there")
+                continue
+            f = music.root / s["artist"] / f"{s['title']}.flac"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(b"x" * 20)
+            tell(s["id"], path=f"{s['artist']}/{s['title']}.flac")
+        tell(message="All done", progress=1)
+
+
+def _engine(tmp_path, run):
+    from sv.influence_engine import Engine
+    (tmp_path / "music").mkdir(exist_ok=True)
+    cfg = types.SimpleNamespace(music=str(tmp_path / "music"), trainer_root=tmp_path / "trainer", data=tmp_path / "data",
+                                ffmpeg="ffmpeg")
+    store = _Store(run)
+    app = types.SimpleNamespace(cfg=cfg, store=store, hub=types.SimpleNamespace(publish=lambda *a: None))
+    return Engine(app, None), store
+
+
+def test_the_song_finder_looks_for_what_isnt_in_your_music_and_spares_fill_in(tmp_path):
+    artists = [{"name": f"Artist {i}", "why": "", "songs": ["A", "B", "C", "D"]} for i in range(12)]  # 3 used, 1 spare each
+    plan = {"name": "Tape", "kind": "Style", "trigger": "tape", "about": "", "howMany": "", "style": "", "voice": "",
+            "previewLyrics": "", "artists": artists}
+    eng, store = _engine(tmp_path, {"id": "run1", "status": "researching", "ask": {"text": "tape"}, "songs": []})
+    (tmp_path / "music" / "Artist 0").mkdir()
+    (tmp_path / "music" / "Artist 0" / "01 - A.flac").write_bytes(b"x" * 20)
+
+    async def write(task, data):
+        return {"result": plan, "by": {"kind": "test"}}
+    eng.writers = types.SimpleNamespace(write=write)
+    eng.finder = _Finder(has={"C", "D"})
+    asyncio.run(eng.research(_Ctx(store, "run1")))
+    run = store.run("run1")
+    a0 = {s["title"]: s for s in run["songs"] if s["artist"] == "Artist 0"}
+    assert a0["A"]["source"] == "library" and a0["A"]["id"] not in {s["id"] for s in eng.finder.asked}
+    assert a0["C"]["source"] == "finder" and a0["C"]["found"]["seconds"] == 200 and a0["C"]["seconds"] == 200
+    assert a0["B"]["source"] == "needed" and not a0["B"]["use"] and a0["D"]["use"]  # the spare took its place
+    assert run["finder"] == "Tape Deck" and run["finderNote"] is None and run["status"] == "planned"
+
+
+def test_the_song_finder_gets_its_songs_into_your_music_before_they_are_gathered(tmp_path, monkeypatch):
+    from sv.influence_engine import Engine
+    songs = [{"id": f"track-{i:03d}", "artist": "Band", "title": f"Song {i}", "source": "finder", "use": True,
+              "state": "waiting"} for i in range(9)]
+    run = {"id": "run2", "status": "planned", "folder": "training/x", "finder": "Tape Deck", "songs": songs}
+    eng, store = _engine(tmp_path, run)
+    eng.finder = _Finder(has=set(), fails={"Song 4"})
+
+    async def to_flac(self, src, dest):
+        dest.write_bytes(src.read_bytes())
+
+    async def no_words(self, *a):
+        return ""
+    monkeypatch.setattr(Engine, "_to_flac", to_flac)
+    monkeypatch.setattr(Engine, "_published_lyrics", no_words)
+    ctx = _Ctx(store, "run2")
+    asyncio.run(eng.gather(ctx))
+    got = {s["title"]: s for s in store.run("run2")["songs"]}
+    assert got["Song 0"]["source"] == "library" and got["Song 0"]["path"] == "Band/Song 0.flac" and got["Song 0"]["state"] == "ready"
+    assert got["Song 4"]["state"] == "failed" and got["Song 4"]["note"] == "It wasn't there"
+    assert ctx.queued == ["influence.listen"] and "Getting 9 songs with Tape Deck" in ctx.said
+
+
+def test_a_run_whose_song_finder_has_gone_says_so(tmp_path):
+    songs = [{"id": "track-001", "artist": "Band", "title": "Song", "source": "finder", "use": True, "state": "waiting"}]
+    eng, store = _engine(tmp_path, {"id": "run3", "status": "planned", "folder": "training/y", "finder": "Tape Deck", "songs": songs})
+    with pytest.raises(JobError, match="at least 8"):
+        asyncio.run(eng.gather(_Ctx(store, "run3")))
+    assert store.run("run3")["songs"][0]["note"] == "Tape Deck isn't here any more: add its audio"
+
+
+def test_add_ons_are_loaded_from_a_folder_and_one_that_breaks_is_skipped(tmp_path):
+    from sv import addons
+    (tmp_path / "good.py").write_text("def register(app):\n    app.seen.append('good')\n")
+    (tmp_path / "bad.py").write_text("raise RuntimeError('no')\n")
+    (tmp_path / "_helper.py").write_text("raise RuntimeError('not an add-on')\n")
+    app = types.SimpleNamespace(seen=[])
+    assert addons.load(str(tmp_path), app) == ["good"] and app.seen == ["good"]
+    assert addons.load("", app) == [] and addons.load(str(tmp_path / "none"), app) == []
+
+
+def test_a_run_planned_before_there_was_a_song_finder_gets_its_missing_songs_when_it_carries_on(tmp_path, monkeypatch):
+    from sv.influence_engine import Engine
+    songs = [{"id": f"track-{i:03d}", "artist": "Band", "title": f"Song {i}", "source": "needed", "use": True,
+              "state": "needed", "note": "Add its audio"} for i in range(9)]
+    eng, store = _engine(tmp_path, {"id": "run4", "status": "stopped", "folder": "training/z", "songs": songs})
+    eng.finder = _Finder(has={f"Song {i}" for i in range(8)})
+
+    async def to_flac(self, src, dest):
+        dest.write_bytes(src.read_bytes())
+
+    async def no_words(self, *a):
+        return ""
+    monkeypatch.setattr(Engine, "_to_flac", to_flac)
+    monkeypatch.setattr(Engine, "_published_lyrics", no_words)
+    asyncio.run(eng.gather(_Ctx(store, "run4")))
+    run = store.run("run4")
+    got = {s["title"]: s for s in run["songs"]}
+    assert run["finder"] == "Tape Deck" and got["Song 0"]["state"] == "ready" and got["Song 0"]["source"] == "library"
+    assert got["Song 8"]["source"] == "needed" and got["Song 8"]["note"] == "Add its audio"
+
+
+def test_songs_that_cant_be_had_give_way_to_others_by_the_same_artist():
+    from sv.influence_engine import replace
+    songs = [{"id": "track-001", "artist": "Band", "title": "Hit", "source": "finder", "use": True},
+             {"id": "track-002", "artist": "Band", "title": "Rarity", "source": "needed", "use": True},
+             {"id": "track-003", "artist": "Band", "title": "Deep Cut", "source": "needed", "use": False},  # left out: stays so
+             {"id": "track-004", "artist": "Duo", "title": "Lost", "source": "needed", "use": True}]
+    asyncio.run(replace(_Finder(has=set(), others=["Hit", "Second Hit", "Third Hit"]), songs))
+    assert [s["title"] for s in songs if s["use"]] == ["Hit", "Second Hit", "Hit"]
+    new = {s["id"]: s for s in songs[4:]}
+    assert new["track-005"] == {"id": "track-005", "artist": "Band", "title": "Second Hit", "source": "finder",
+                                "found": {"title": "Second Hit", "seconds": 210}, "seconds": 210, "use": True,
+                                "state": "waiting", "instead": "Rarity"}
+    assert not songs[1]["use"] and not songs[2]["use"]
+    assert new["track-006"]["artist"] == "Duo" and new["track-006"]["instead"] == "Lost"
+    plain = [dict(s) for s in songs[:4]]
+    asyncio.run(replace(types.SimpleNamespace(name="No ideas"), plain))  # a finder that can't suggest any
+    assert len(plain) == 4
+
+
+def test_carrying_on_replaces_what_still_cant_be_found(tmp_path, monkeypatch):
+    from sv.influence_engine import Engine
+    songs = [{"id": f"track-{i:03d}", "artist": "Band", "title": f"Song {i}", "source": "needed", "use": True,
+              "state": "needed"} for i in range(9)]
+    eng, store = _engine(tmp_path, {"id": "run5", "status": "stopped", "folder": "training/r", "songs": songs})
+    eng.finder = _Finder(has={f"Song {i}" for i in range(7)}, others=["Song 0", "Encore", "Finale"])
+
+    async def to_flac(self, src, dest):
+        dest.write_bytes(src.read_bytes())
+
+    async def no_words(self, *a):
+        return ""
+    monkeypatch.setattr(Engine, "_to_flac", to_flac)
+    monkeypatch.setattr(Engine, "_published_lyrics", no_words)
+    asyncio.run(eng.gather(_Ctx(store, "run5")))
+    got = {s["title"]: s for s in store.run("run5")["songs"]}
+    assert not got["Song 7"]["use"] and not got["Song 8"]["use"]
+    assert got["Encore"]["instead"] == "Song 7" and got["Finale"]["instead"] == "Song 8"
+    assert got["Encore"]["state"] == "ready" and got["Encore"]["source"] == "library"

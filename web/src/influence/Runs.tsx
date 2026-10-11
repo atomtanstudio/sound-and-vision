@@ -32,6 +32,10 @@ function clock(s?: number) {
 /** "What should your songs have more of?" — starts the research. Prefilled from a take's "Needs more influence". */
 export function NewRun({ projectId, takeId, songTitle }: { projectId?: string; takeId?: string; songTitle?: string }) {
   const roles = useWho((w) => w.roles);
+  const [finder, setFinder] = useState<string | null>(null);
+  useEffect(() => {
+    void api.get<{ name: string | null }>("/api/song-finder").then((r) => setFinder(r.name), () => setFinder(null));
+  }, []);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +70,9 @@ export function NewRun({ projectId, takeId, songTitle }: { projectId?: string; t
       />
       <div className="ie-new-row">
         <p>
-          {Doer(roles, "research")} picks the artists and songs that define it. Songs in your music folder are used; for the rest you add the
-          audio yourself, from music you own. You check the list before anything trains.
+          {Doer(roles, "research")} picks the artists and songs that define it. Songs in your music folder are used;{" "}
+          {finder ? <>{finder} gets the rest, and you add the audio for any it can't find.</> : <>for the rest you add the audio yourself, from music you own.</>}{" "}
+          You check the list before anything trains.
         </p>
         <Button kind="primary" busy={busy} disabled={!text.trim() || busy} onClick={() => void start()}>
           Research it
@@ -97,13 +102,15 @@ function Steps({ run }: { run: InfluenceRun }) {
   );
 }
 
-const HAS_AUDIO = (s: RunSong) => s.source === "library" || s.source === "yours" || s.state === "ready";
+/** Has its audio, or will: the run's song finder counts as having it */
+const HAS_AUDIO = (s: RunSong) => s.source === "library" || s.source === "yours" || s.source === "finder" || s.state === "ready";
 
-function SongRow({ s, editable, onToggle, onAdd }: { s: RunSong; editable: boolean; onToggle: () => void; onAdd: (f: File) => void }) {
+function SongRow({ s, finder, editable, onToggle, onAdd }: { s: RunSong; finder: string; editable: boolean; onToggle: () => void; onAdd: (f: File) => void }) {
   const pick = useRef<HTMLInputElement>(null);
   const state = !s.use && !editable ? "Left out" :
     s.state === "ready" ? "Ready" : s.state === "failed" ? s.note || "Couldn't use it" : s.state === "copying" ? "Getting it ready…" :
-    s.source === "library" ? "In your music" : s.source === "yours" ? "Added" : "Needs its audio";
+    s.state === "downloading" ? `Getting it with ${finder}…` :
+    s.source === "library" ? "In your music" : s.source === "yours" ? "Added" : s.source === "finder" ? `${finder} will get it` : "Needs its audio";
   return (
     <li className={`ie-song${s.use ? "" : " off"} st-${s.state} src-${HAS_AUDIO(s) ? s.source : "needed"}`}>
       {editable ? (
@@ -113,7 +120,7 @@ function SongRow({ s, editable, onToggle, onAdd }: { s: RunSong; editable: boole
       )}
       <span className="ie-song-name">
         <strong>{s.title}</strong>
-        <span>{s.artist}{s.seconds ? ` · ${clock(s.seconds)}` : ""}{s.source === "yours" && s.file ? ` · ${s.file}` : ""}</span>
+        <span>{s.artist}{s.seconds ? ` · ${clock(s.seconds)}` : ""}{s.source === "yours" && s.file ? ` · ${s.file}` : ""}{s.instead ? ` · instead of ${s.instead}` : ""}</span>
       </span>
       {editable && !HAS_AUDIO(s) ? (
         <>
@@ -279,6 +286,8 @@ export function RunCard({ run }: { run: InfluenceRun }) {
   const usable = run.songs.filter((s) => !drop.has(s.id) && (editable || s.state !== "failed"));
   const withAudio = usable.filter(HAS_AUDIO);
   const needAudio = usable.length - withAudio.length;
+  const finder = run.finder || "The song finder";
+  const fromFinder = usable.filter((s) => s.source === "finder" && s.state !== "ready").length;
   const [sent, setSent] = useState<number | null>(null);
   const [added, setAdded] = useState<string | null>(null);
   const [over, setOver] = useState(false);
@@ -385,6 +394,7 @@ export function RunCard({ run }: { run: InfluenceRun }) {
                 {editable && needAudio > 0 && <span> · {needAudio} need their audio</span>}
               </h3>
               {editable && run.musicNote && <p className="ie-note">Your music couldn't be read ({run.musicNote}), so every song needs its audio added.</p>}
+              {editable && run.finderNote && <p className="ie-note">{finder} couldn't be asked ({run.finderNote}), so the songs that aren't in your music need their audio added.</p>}
               {editable && (
                 <div className={`ie-drop${over ? " over" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
@@ -399,7 +409,7 @@ export function RunCard({ run }: { run: InfluenceRun }) {
               )}
               <ul>
                 {run.songs.map((s) => (
-                  <SongRow key={s.id} s={{ ...s, use: !drop.has(s.id) }} editable={editable}
+                  <SongRow key={s.id} s={{ ...s, use: !drop.has(s.id) }} finder={finder} editable={editable}
                     onToggle={() => setDrop((d) => { const n = new Set(d); if (n.has(s.id)) n.delete(s.id); else n.add(s.id); return n; })}
                     onAdd={(f) => void addAudio([f], s.id)} />
                 ))}
@@ -410,6 +420,7 @@ export function RunCard({ run }: { run: InfluenceRun }) {
           {editable && (
             <div className="ie-go">
               <p>
+                {fromFinder > 0 ? <>{finder} gets {fromFinder === 1 ? "one song" : `${fromFinder} songs`} first. </> : null}
                 {needAudio > 0 ? <>Songs still without their audio are left out (your music is looked through once more first). </> : null}
                 {withAudio.length < 8 ? <>Add the audio for at least {8 - withAudio.length} more to start. </> : null}
                 Training takes about 30–40 minutes on {machine()} and holds the GPU, so new songs wait until it's done.

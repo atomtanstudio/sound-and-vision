@@ -1,10 +1,11 @@
 """The Influence Engine: from "this needs more of a sound" to a trained influence in the library.
 
     research (net)  a writer picks the artists and songs that define the sound (popular, with variety) and says why
-                    that many; each song is looked for in your music (SV_MUSIC: a folder, or a network share)
-    [the user looks over the plan, adds the audio for any song that isn't in their music, and starts it]
-    gather   (net)  your music is looked through again, then every song with its audio (from your music, or added to
-                    the run) becomes FLAC in the trainer's input folder
+                    that many; each song is looked for in your music (SV_MUSIC: a folder, or a network share), and the
+                    rest with the song finder, if an add-on gave one (see SongFinder)
+    [the user looks over the plan, adds the audio for any song that can't be had, and starts it]
+    gather   (net)  the song finder gets its songs into your music, your music is looked through again, then every
+                    song with its audio (from your music, or added to the run) becomes FLAC in the trainer's input folder
     listen   (gpu)  MOSS-Music writes each song's caption and lyrics sidecars (the lyrics never leave those files)
     train    (gpu)  FL YuE2's own trainer (not AI-Toolkit): its standard recipe plus the sound branch, 1,000 steps,
                     a checkpoint and a short preview every 100, followed live
@@ -26,7 +27,7 @@ import time
 import unicodedata
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Protocol
 
 import httpx
 
@@ -233,6 +234,66 @@ async def gpu_users() -> str:
     return "\n".join(rows)
 
 
+# ---- a song finder: an add-on that gets songs into your music -------------------------------------------
+
+class SongFinder(Protocol):
+    """Gets the songs a run needs into your music, so you don't add their audio by hand. Given by an add-on (see
+    sv/addons.py) as `app.influence.finder`. A song is {id, artist, title, ...}."""
+
+    name: str  # said on the plan: "<name> will get it"
+
+    async def look(self, songs: list[dict]) -> dict[str, dict]:
+        """The songs it can get, by id: {"title": as it has it, "seconds": its length, ...anything it needs later}.
+        Kept on the song as "found". A song it can't get is left out. JobError: it couldn't be asked."""
+        ...
+
+    async def get(self, songs: list[dict], music: "Folder | Share | None", tell: Callable[..., None]) -> None:
+        """Gets each song into your music. As each one goes: tell(song id, state="downloading"), then
+        tell(song id, path=its path in your music, as music.songs_of gives them; or None to look for it there), or
+        tell(song id, state="failed", note=why). tell(message=..., progress=0–1) for how it's going overall."""
+        ...
+
+    # and, if it can: async def instead(self, artist: str, have: list[str], count: int) -> list[dict]
+    #   up to `count` other songs by the artist (not titled as any in `have`) that it can get, as look gives them, for
+    #   songs chosen that can't be had
+
+
+def available(song: dict) -> bool:
+    """Has its audio, or will: in your music, added to the run, or the song finder has it."""
+    return song["source"] in ("library", "yours", "finder")
+
+
+def use_spares(songs: list[dict]) -> None:
+    """A song chosen that can't be had gives way to one of the same artist's spares that can."""
+    for artist in dict.fromkeys(s["artist"] for s in songs):
+        mine = [s for s in songs if s["artist"] == artist]
+        spares = [s for s in mine if not s["use"] and available(s)]
+        for s in [s for s in mine if s["use"] and not available(s)]:
+            if not spares:
+                break
+            s["use"], spares.pop(0)["use"] = False, True
+
+
+async def replace(finder: "SongFinder | None", songs: list[dict]) -> None:
+    """Songs chosen that can't be had give way to others by the same artist that the song finder can get (when it can
+    suggest some). The new ones say which song they're instead of."""
+    gone = [s for s in songs if s["use"] and not available(s)]
+    if not (gone and finder and hasattr(finder, "instead")):
+        return
+    last = max((int(s["id"].rsplit("-", 1)[-1]) for s in songs if s["id"].rsplit("-", 1)[-1].isdigit()), default=0)
+    for artist in dict.fromkeys(s["artist"] for s in gone):
+        mine = [s for s in gone if s["artist"] == artist]
+        try:
+            more = await finder.instead(artist, [s["title"] for s in songs if s["artist"] == artist], len(mine))
+        except JobError:
+            continue
+        for s, f in zip(mine, more):
+            last += 1
+            s["use"] = False
+            songs.append({"id": f"track-{last:03d}", "artist": artist, "title": f["title"], "source": "finder", "found": f,
+                          "seconds": f.get("seconds"), "use": True, "state": "waiting", "instead": s["title"]})
+
+
 # ---- the run ----------------------------------------------------------------------------------
 
 class Engine:
@@ -240,6 +301,7 @@ class Engine:
         self.app, self.writers = app, writers
         self.cfg = app.cfg
         self.lengths: dict[str, float] = {}  # preview file -> seconds
+        self.finder: SongFinder | None = None  # an add-on's (see sv/addons.py)
 
     # where things live
     def folder(self, run: dict) -> Path:
@@ -326,9 +388,24 @@ class Engine:
                 songs.append({"id": f"track-{len(songs) + 1:03d}", "artist": a["name"], "title": title,
                               "source": "library" if have else "needed", "path": have and have["path"],
                               "use": k < per, "state": "waiting"})
+        finder, finder_note = self.finder, None
+        needed = [s for s in songs if s["source"] == "needed"]
+        if finder and needed:
+            ctx.update(message=f"Looking for the rest with {finder.name}", progress=0.96)
+            try:
+                found = await finder.look([{k: s[k] for k in ("id", "artist", "title")} for s in needed])
+            except JobError as exc:
+                found, finder_note = {}, exc.message
+            for s in needed:
+                if isinstance(f := found.get(s["id"]), dict):
+                    s.update(source="finder", found=f, seconds=f.get("seconds"))
+        use_spares(songs)
+        if finder and not finder_note:
+            await replace(finder, songs)
         if sum(s["use"] for s in songs) < 8:
             raise JobError("Not enough songs were picked. Try describing the sound differently.")
         self.save(rid, "planned", artists=artists, songs=songs, musicNote=missing_music,
+                  finder=finder and finder.name, finderNote=finder_note,
                   message="Add the audio for the songs, then start")
         return {"songs": len(songs), "inLibrary": sum(s["source"] == "library" for s in songs)}
 
@@ -380,6 +457,8 @@ class Engine:
         tmp = self.files(rid) / "incoming"
         tmp.mkdir(parents=True, exist_ok=True)
         lib = library(self.cfg.music)
+        await self._find(ctx, rid, run, lib)
+        run = ctx.store.run(rid)
         if lib:  # songs still without audio: you may have put them in your music since
             ctx.update(stage="look", message="Looking through your music again", progress=0.02)
             owned: dict[str, list[dict]] = {}
@@ -398,7 +477,10 @@ class Engine:
             ctx.update(stage="copy", message=f"Getting {s['artist']} – {s['title']} ready", progress=0.05 + 0.9 * i / max(1, len(todo)))
             yours = next(iter(self.uploads(rid).glob(f"{s['id']}.*")), None) if s["source"] == "yours" else None
             if not yours and not (s["source"] == "library" and s.get("path") and lib):
-                self.song(rid, s["id"], state="needed", note="Add its audio")
+                if s["source"] != "finder":
+                    self.song(rid, s["id"], state="needed", note="Add its audio")
+                elif s.get("state") != "failed":
+                    self.song(rid, s["id"], state="failed", note=f"{run.get('finder') or 'The song finder'} couldn't get it")
                 continue
             self.song(rid, s["id"], state="copying")
             src = yours or tmp / f"{s['id']}{Path(s['path']).suffix.lower()}"
@@ -425,6 +507,66 @@ class Engine:
         job = ctx.sched.submit("influence.listen", {"runId": rid})
         self.save(rid, "listening", message="Waiting to listen", jobId=job["id"], resumeAt="listen")
         return {"ready": len(ready)}
+
+    async def _find(self, ctx: Context, rid: str, run: dict, lib: "Folder | Share | None") -> None:
+        """The song finder gets its songs into your music (those not gathered already). A song it gets is then in your
+        music like any other; one it can't is said, and its audio can be added by hand. Songs still needing their audio
+        are looked for first: the run may have been planned before there was a song finder."""
+        folder = self.folder(run)
+
+        def waiting(s: dict) -> bool:
+            return bool(s.get("use")) and not (folder / f"{s['id']}.flac").exists()
+
+        if self.finder and run.get("finder") in (None, self.finder.name):
+            needed = [s for s in run["songs"] if waiting(s) and s["source"] in ("needed", "download", "missing")]
+            if needed:
+                ctx.update(stage="get", message=f"Looking for {len(needed)} songs with {self.finder.name}", progress=0.01)
+                try:
+                    found = await self.finder.look([{k: s[k] for k in ("id", "artist", "title")} for s in needed])
+                except JobError:
+                    found = {}
+                for s in needed:
+                    if isinstance(f := found.get(s["id"]), dict):
+                        self.song(rid, s["id"], source="finder", found=f, seconds=f.get("seconds") or s.get("seconds"),
+                                  state="waiting", note=None)
+            run = ctx.store.run(rid)
+            songs = run["songs"]
+            await replace(self.finder, songs)
+            run = self.save(rid, songs=songs, finder=self.finder.name)
+        songs = [s for s in run["songs"] if waiting(s) and s["source"] == "finder"]
+        if not songs:
+            return
+        name = run.get("finder") or "the song finder"
+        if self.finder is None or self.finder.name != run.get("finder"):
+            for s in songs:
+                self.song(rid, s["id"], state="failed", note=f"{name} isn't here any more: add its audio")
+            return
+        ctx.update(stage="get", message=f"Getting {len(songs)} songs with {name}", progress=0.02)
+        ids = {s["id"] for s in songs}
+
+        def tell(sid: str | None = None, *, state: str | None = None, note: str | None = None, path: Any = False,
+                 message: str | None = None, progress: float | None = None) -> None:
+            if sid is None:
+                ctx.update(message=message, progress=None if progress is None else 0.02 + 0.5 * max(0.0, min(1.0, progress)))
+            elif sid in ids and path is not False:
+                fields = {"source": "library", "path": path, "state": "waiting", "note": None} if path else \
+                         {"state": "waiting", "note": None}
+                self.song(rid, sid, **fields)
+            elif sid in ids and state:
+                self.song(rid, sid, state=state, note=note[:200] if note else None)
+
+        try:
+            await self.finder.get(songs, lib, tell)
+        except Cancelled:
+            raise
+        except Exception as exc:  # it couldn't carry on: the songs it didn't get say why, and the rest carry on
+            if not isinstance(exc, JobError):
+                log.exception("The song finder %s failed", name)
+            now = {x["id"]: x for x in ctx.store.run(rid)["songs"]}
+            for s in songs:
+                if now[s["id"]]["source"] == "finder" and now[s["id"]].get("state") != "failed":
+                    self.song(rid, s["id"], state="failed",
+                              note=exc.message[:200] if isinstance(exc, JobError) else f"{name} ran into a problem")
 
     async def _published_lyrics(self, lib: "Folder | Share | None", path: str | None, audio: Path, tmp: Path) -> str:
         """The words as published: an .lrc beside the file in your music, or a lyrics tag in it. Time stamps and the

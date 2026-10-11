@@ -400,13 +400,15 @@ export interface RunSong {
   title: string;
   album?: string;
   seconds?: number;
-  /** library: found in your music; yours: audio you added to the run; needed: no audio yet ("download" and
-   *  "missing" are from older runs, and mean the same as needed) */
-  source: "library" | "yours" | "needed" | "download" | "missing";
+  /** library: found in your music; yours: audio you added to the run; finder: the run's song finder (an add-on)
+   *  will get it; needed: no audio yet ("download" and "missing" are from older runs, and mean the same as needed) */
+  source: "library" | "yours" | "finder" | "needed" | "download" | "missing";
   use: boolean;
   state: "waiting" | "needed" | "downloading" | "copying" | "ready" | "failed";
   /** the name of the file you added */
   file?: string;
+  /** the song it's instead of: one that couldn't be had, swapped for another by the same artist */
+  instead?: string;
   note?: string | null;
   asked?: boolean;
   instrumental?: boolean;
@@ -442,6 +444,9 @@ export interface InfluenceRun {
   songs: RunSong[];
   /** your music (SV_MUSIC) couldn't be read when the songs were chosen: why */
   musicNote?: string | null;
+  /** the add-on that gets songs that aren't in your music (its name), and why it couldn't be asked, if it couldn't */
+  finder?: string | null;
+  finderNote?: string | null;
   train?: {
     step: number;
     steps: number;

@@ -37,7 +37,7 @@ from .jobs import JobError, Scheduler
 from .music import eleven, yue2
 from .music.takes import run_other_take, run_yue2_take
 from . import covers as covers_mod, influence_engine, songs
-from . import imports as imports_mod
+from . import addons as addons_mod, imports as imports_mod
 from . import brand as brand_mod, library as library_mod, look as look_mod, share as share_mod
 from .video import finish as finish_mod
 from .video import kinetic as kinetic_mod
@@ -75,6 +75,7 @@ APP = _App()
 APP.cfg, APP.store, APP.hub, APP.sched = cfg, store, hub, sched
 songs.register(sched, APP, writers)
 engine = influence_engine.register(sched, APP, writers)
+APP.influence = engine
 covers = covers_mod.register(sched, APP, writers)
 APP.covers = covers
 living = living_mod.register(sched, APP, writers)
@@ -89,6 +90,7 @@ library = library_mod.Library(APP)
 APP.library = library
 share = share_mod.register(sched, APP)
 APP.share = share
+addons_mod.load(cfg.addons, APP)  # your own (SV_ADDONS), after everything they can add to
 TOKEN = cfg.token()
 
 
@@ -1468,6 +1470,12 @@ def _run_or_404(rid: str) -> dict:
 @app.get("/api/influence-runs")
 async def list_runs() -> list[dict]:
     return store.runs()
+
+
+@app.get("/api/song-finder")
+async def song_finder() -> dict:
+    """The add-on that gets a training run's songs, if there is one: its name."""
+    return {"name": engine.finder.name if engine.finder else None}
 
 
 @app.get("/api/influence-runs/{rid}")

@@ -9,6 +9,8 @@
 #   ROOT=/srv/sv                the install there: ROOT/app (server), ROOT/web/dist, ROOT/sv.env (its settings)
 #   UV=uv                       uv on that machine
 #   COMFY_NODES=                optional: sv-comfy's custom_nodes folder there, to update our sv_nodes in it
+#   ADDONS=                     optional: a folder of your own add-ons here, copied to ROOT/addons there (set
+#                               SV_ADDONS=ROOT/addons in its sv.env to load them)
 #
 # The app's own settings (data folder, port, models…) are in ROOT/sv.env on that machine (see sv.env.example).
 # A restart stops whatever job is running (a take half-sung is lost), so this refuses while any job is queued or
@@ -48,6 +50,10 @@ there "mkdir -p \${SV_LORAS:-\${SV_MODELS:-$ROOT/models}/comfyui/loras}/soundand
 rsync -a infra/legion/influences/yue2/ "$HOST:$(there 'echo ${SV_LORAS:-${SV_MODELS:-'"$ROOT"'/models}/comfyui/loras}')/soundandvision/yue2/"
 [ "$WEB" = 1 ] && rsync -a --delete web/dist/ "$HOST:$ROOT/web/dist/"
 [ -n "${COMFY_NODES:-}" ] && rsync -a infra/legion/comfy/custom_nodes/sv_nodes/ "$HOST:$COMFY_NODES/sv_nodes/"
+if [ -n "${ADDONS:-}" ]; then
+  [ -d "$ADDONS" ] || { echo "ADDONS in scripts/deploy.env isn't a folder: $ADDONS" >&2; exit 2; }
+  rsync -a --delete --exclude __pycache__ --exclude tests --exclude .git "$ADDONS/" "$HOST:$ROOT/addons/"
+fi
 sed -e "s|@SERVER@|$ROOT/app|g" -e "s|@ENV@|$ROOT/sv.env|g" infra/sv-app.service.in | ssh "$HOST" 'cat > ~/.config/systemd/user/sv-app.service'
 
 ssh "$HOST" "cd $ROOT/app && UV_PYTHON=python3.12 $UV sync -q --no-dev && systemctl --user daemon-reload && systemctl --user enable -q sv-app && systemctl --user restart sv-app"
