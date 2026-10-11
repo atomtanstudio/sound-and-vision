@@ -29,6 +29,146 @@ you choose which does what.
 - **MCP servers.** Add your own (streamable HTTP, with a key or their OAuth sign-in) in Settings. Your director model
   can use them while it works, and they can make pictures or animate scenes. Servers marked paid ask before each job.
 
+## Set it up, step by step
+
+Plan an afternoon. The first install builds the app's containers (about an hour), and the models are big downloads
+(about 28 GB to make songs and covers, 41 GB more for videos). Everything below happens in a terminal on the GPU
+machine, logged in as the account the app will run as: at its keyboard, or over `ssh`, but not through `su` or `sudo`.
+
+### 1. Check the machine
+
+You need Linux on x86_64 (developed on Ubuntu; the reference machine runs Ubuntu 26.04), an NVIDIA GPU with 24 to
+32 GB of memory, and about 200 GB of free disk. The full list is under [Requirements](#requirements).
+
+### 2. Install what the app runs on
+
+These are the commands for Ubuntu. On another distribution, follow each project's own guide.
+
+**The NVIDIA driver.** Install the recommended driver, restart, then check it:
+
+```sh
+sudo ubuntu-drivers install
+sudo reboot
+nvidia-smi
+```
+
+`nvidia-smi` must list your GPU and show "CUDA Version: 13.2" or higher (the reference machine runs driver 595.99).
+If the version is lower, install a newer driver from [NVIDIA](https://www.nvidia.com/en-us/drivers/).
+
+**Docker.** Install Docker Engine with its Compose plugin, and let your account use it:
+
+```sh
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+```
+
+Log out and back in, so the new group takes effect. `docker run --rm hello-world` should then work without `sudo`.
+
+**NVIDIA Container Toolkit.** This lets containers use the GPU. These are
+[NVIDIA's commands](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html):
+
+```sh
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+docker run --rm --gpus all ubuntu nvidia-smi
+```
+
+The last command should print the same GPU table as before, from inside a container.
+
+**The rest:** git, ffmpeg, curl, [uv](https://docs.astral.sh/uv/) and Node.js 22.
+
+```sh
+sudo apt-get install -y git ffmpeg curl
+curl -LsSf https://astral.sh/uv/install.sh | sh
+sudo apt-get install -y nodejs npm
+node --version
+```
+
+Open a new terminal afterwards, so `uv` is on your `PATH`. If `node --version` is older than 22.12, install Node 22
+from [NodeSource](https://github.com/nodesource/distributions) instead.
+
+### 3. Install Sound / Vision
+
+```sh
+git clone https://github.com/atomtanstudio/sound-and-vision.git
+cd sound-and-vision
+scripts/install.sh --check
+```
+
+`--check` changes nothing. It lists anything still missing, marked `needed`. Put those right, then install:
+
+```sh
+scripts/install.sh --open-lan
+```
+
+`--open-lan` lets the devices on your home network use the app without a key. Leave it out if other people share your
+network. The first run takes about an hour, most of it building the `sv-comfy` image. It ends by printing the
+addresses to open. If it says linger needs an administrator, run the `sudo loginctl enable-linger` command it prints,
+so the app starts with the machine. [What install.sh does](#what-installsh-does) has the details.
+
+### 4. Download the models
+
+```sh
+scripts/models.sh                  # what each set is for, its size, and what's here already
+scripts/models.sh starter          # songs, covers and pictures (about 28 GB)
+scripts/models.sh video            # Living Album Covers and music videos (41 GB more)
+```
+
+The other sets are `ace` and `music3` (two more song models), `whisper` (hears the words of songs you upload without
+lyrics) and `all`. Each file is checked against its published checksum. An interrupted download carries on where it
+stopped when you run the command again. Each model has its own licence; see [Licences](#licences). MiniMax H3's
+licence doesn't cover use in the US, the EU, the UK or Korea.
+
+### 5. Connect a language model
+
+A language model writes the lyrics, names things and plans the pictures. Connect at least one.
+
+- **On the machine itself.** Install [Ollama](https://ollama.com) and pull a model; it shows up in Settings. A small
+  model leaves the GPU to the music and video models (the reference machine runs `qwen3.5:4b`):
+
+  ```sh
+  curl -fsSL https://ollama.com/install.sh | sh
+  ollama pull qwen3.5:4b
+  ```
+
+- **A frontier model under your own account.** Claude, ChatGPT or Grok: see [Sign-ins](#sign-ins). Motion Graphics
+  and music videos need a director that writes and runs code, which today is Claude Code. Sign it in once from this
+  checkout:
+
+  ```sh
+  infra/studio/studio.sh signin
+  ```
+
+  It prints a link. Open it in any browser, approve, and paste the code back.
+
+### 6. Open it and make something
+
+On your phone or laptop, open `http://<machine>:7660`, using the name or address install.sh printed. (Without
+`--open-lan`, pair the browser first: see [Open it](#open-it).)
+
+1. Open **Settings** (top right). Check that your language model shows as connected, and choose who does each job
+   under **Who does what**.
+2. On **Home**, describe a song in a sentence. You get the lyrics and takes to listen to, then stems and timed words.
+3. Open a song's cover to paint one. Then go to **Video** to make a Living Album Cover, Motion Graphics or a Music Video.
+
+### If something goes wrong
+
+| What you see | What to do |
+|---|---|
+| install.sh stops with things marked `needed` | Install those (step 2), then run it again. Running it again is always safe. |
+| `permission denied` from Docker | Log out and back in after `usermod -aG docker`, or restart the machine. |
+| GPU containers fail with "Driver/library version mismatch" | The NVIDIA packages updated underneath the running driver. Restart the machine. |
+| The page doesn't load from another device | Check the address and port 7660. If you turned on a firewall (`ufw`), allow port 7660 from your home network. To use a name the app doesn't know, add it to `SV_HOSTS`. |
+| The page asks for a key | Your device isn't on a network in `SV_OPEN_NETWORKS`. Pair it once with the key: see [Open it](#open-it). |
+| Songs, pictures or videos fail straight away | `scripts/install.sh --check` lists the model files still missing. `docker logs sv-comfy` shows ComfyUI's side. |
+| Anything else | The app's log: `journalctl --user -u sv-app -n 100`. |
+
 ## How it fits together
 
 Everything runs on the one machine:
@@ -49,6 +189,8 @@ Everything runs on the one machine:
 - An NVIDIA GPU with 24 to 32 GB of memory (the reference machine has an RTX 5090 with 32 GB), of compute capability
   8.0, 8.6, 8.9, 9.0 or 12.0 (A100, RTX 30xx, RTX 40xx, H100, RTX 50xx), and a driver for CUDA 13.2 or newer
   (`nvidia-smi` shows "CUDA Version: 13.2" or higher).
+- System memory: the reference machine has 128 GB. MiniMax H3's files alone come to about 40 GB, and ComfyUI stages
+  models through system memory, so plan on 64 GB or more.
 - Docker Engine with Compose v2 and the
   [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
   (`docker run --gpus all …` must work), usable by your account (the `docker` group).
@@ -61,19 +203,10 @@ Everything runs on the one machine:
   Code, the director the studio runs today. Songs, covers and everything else work with a local model alone.
 - Optional: `smbclient`, to read your music from a network share.
 
-## Install
+## What install.sh does
 
-On the GPU machine, as the account the app should run as (not root):
-
-```sh
-git clone https://github.com/atomtanstudio/sound-and-vision.git
-cd sound-and-vision
-scripts/install.sh                # add --open-lan to let your home network in without a key
-infra/studio/studio.sh signin     # once: Claude Code's own sign-in with your Claude account
-```
-
-`scripts/install.sh` checks the machine first and says what's missing (`scripts/install.sh --check` only checks).
-Then it:
+`scripts/install.sh` runs on the GPU machine, as the account the app should run as (not root). It checks the machine
+first and says what's missing (`scripts/install.sh --check` only checks). Then it:
 
 1. makes `sv.env` from `sv.env.example` if there isn't one, and, when run in a terminal, offers to open the app to
    your local network (see [Open it](#open-it));
@@ -146,16 +279,12 @@ The service runs with systemd's default `PATH`. If Docker, ffmpeg or a CLI lives
 
 ## Models
 
-The app runs without any model; each feature needs its own. Model files go in `models/comfyui/<folder>/` (or
-`$SV_MODELS/comfyui/`). All but one are on Hugging Face, where a file's address is
-`https://huggingface.co/<repository>/resolve/main/<path in the repository>`. For example:
-
-```sh
-curl -L -o models/comfyui/checkpoints/yue2_3b_bf16.safetensors \
-  https://huggingface.co/Comfy-Org/YuE2/resolve/main/checkpoints/yue2_3b_bf16.safetensors
-```
-
-`scripts/install.sh --check` lists what's missing. Each model has its own licence (see [Licences](#licences)).
+The app runs without any model; each feature needs its own. `scripts/models.sh` downloads them by set (see
+[step 4](#4-download-the-models)), checks each against its published SHA-256 and puts it in place;
+`scripts/install.sh --check` lists what's missing. Model files go in `models/comfyui/<folder>/` (or
+`$SV_MODELS/comfyui/`). To fetch one by hand, a file's address on Hugging Face is
+`https://huggingface.co/<repository>/resolve/main/<path in the repository>`. Each model has its own licence (see
+[Licences](#licences)).
 
 | For | File | Folder in `models/comfyui/` | Size | Hugging Face repository, path |
 |---|---|---|---|---|
@@ -177,19 +306,15 @@ curl -L -o models/comfyui/checkpoints/yue2_3b_bf16.safetensors \
 | | `minimax_h3_video_vae_int8_convrot.safetensors` | `vae/` | 2.8 GB | `Comfy-Org/MiniMax-H3`, `vae/` |
 | Living Album Cover: keeping people still | `sam3.1_multiplex_fp16.safetensors` | `checkpoints/` | 1.75 GB | `Comfy-Org/sam3.1`, `checkpoints/` |
 
-`infra/legion/models/fetch_ace15.sh` downloads ACE-Step 1.5's four files into place and checks them against their
-published SHA-256.
-
 Two more, outside `models/comfyui/`:
 
 - **Hearing the words of your own songs** (an upload that came without lyrics): Whisper large-v3,
-  `Systran/faster-whisper-large-v3`, about 3 GB, kept as a Hugging Face cache folder:
-  `uvx --from huggingface_hub hf download Systran/faster-whisper-large-v3 --cache-dir models/huggingface`.
+  `Systran/faster-whisper-large-v3`, about 3 GB, kept as a Hugging Face cache folder (`scripts/models.sh whisper`).
 - **Stems and word timing**: MelBand RoFormer, htdemucs_6s and wav2vec2 are fetched into
   `models/audio-separation/sv/` the first time a song is analysed (about 3 GB).
 
-The YuE2 instrumental influence isn't published. Without it, YuE2 instrumentals fail; sung YuE2 songs and the other
-song models are unaffected. The Video Builder brings its own model list (see below). MiniMax H3's audio VAE
+YuE2 needs the instrumental influence for instrumentals; `scripts/install.sh` downloads it (and so does
+`scripts/models.sh songs`). The Video Builder brings its own model list (see below). MiniMax H3's audio VAE
 (`minimax_h3_audio_vae_fp32.safetensors`, `Comfy-Org/MiniMax-H3`, `vae/`) is only used by the film kit's
 `tools/h3plate.py`.
 
@@ -235,7 +360,7 @@ unattended upgrades avoids it.
 | `infra/studio/` | The Claude studio image, `studio.sh` and the film kit. |
 | `infra/legion/` | sv-comfy, sv-analysis, the Influence Engine's tools. |
 | `infra/sv-app.service.in` | The systemd user service. |
-| `scripts/` | `install.sh`, and `deploy.sh` for working from another computer. |
+| `scripts/` | `install.sh`, `models.sh`, and `deploy.sh` for working from another computer. |
 | `docs/PLAN.md` | The plan the app was built to. |
 
 - **Server tests:** `cd server && uv run pytest`.

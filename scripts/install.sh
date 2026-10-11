@@ -512,7 +512,7 @@ MODEL_FILES=(
   "Songs with YuE2 (the default)|checkpoints/yue2_3b_bf16.safetensors"
   "Covering a song with YuE2|audio_encoders/sheetsage2_bf16.safetensors"
   "Instrumentals with YuE2 (downloaded by this script)|loras/soundandvision/yue2/ar_lora_inst_v3abc_comfyui.safetensors"
-  "Songs with ACE-Step 1.5 (infra/legion/models/fetch_ace15.sh)|diffusion_models/ace_step_1.5/acestep_v1.5_xl_turbo_bf16.safetensors text_encoders/ace_step_1.5/qwen_0.6b_ace15.safetensors text_encoders/ace_step_1.5/qwen_1.7b_ace15.safetensors vae/ace_step_1.5/ace_1.5_vae.safetensors"
+  "Songs with ACE-Step 1.5|diffusion_models/ace_step_1.5/acestep_v1.5_xl_turbo_bf16.safetensors text_encoders/ace_step_1.5/qwen_0.6b_ace15.safetensors text_encoders/ace_step_1.5/qwen_1.7b_ace15.safetensors vae/ace_step_1.5/ace_1.5_vae.safetensors"
   "Songs with MiniMax Music 3|diffusion_models/minimax_music3/minimax_music3_dit_fp16.safetensors text_encoders/minimax_music3/minimax_music3_text_encoder_pruned_int8_convrot.safetensors vae/minimax_music3/minimax_music3_dav.safetensors"
   "Pictures on this GPU (Krea 2)|diffusion_models/krea2_turbo_fp8_scaled.safetensors text_encoders/qwen3vl_4b_fp8_scaled.safetensors vae/wan_2.1_vae.safetensors"
   "Sharper covers (4x upscale)|upscale_models/4x-ClearRealityV1.pth"
@@ -548,7 +548,7 @@ models_report() {
   if compgen -G "$WHISPER/snapshots/*/model.bin" >/dev/null; then ok "Hearing the words of your own songs (Whisper large-v3)"
   else info "Hearing the words of your own songs (Whisper large-v3): missing, in $WHISPER"; fi
   info "Stems and word timing: fetched into $ANALYSIS_MODELS the first time a song is analysed"
-  note "What each feature needs and where the files come from: README.md, \"Models\"."
+  note "scripts/models.sh downloads them by set: run it on its own to see what each set is for."
 }
 
 # ---- the end ------------------------------------------------------------------------------------------------------
@@ -579,7 +579,9 @@ summary() {
     note "$signin"
     n=$((n + 1))
   fi
-  printf '  %d. Put the model files for the features you want in %s/comfyui (see README.md, "Models").\n' "$n" "$MODELS"
+  printf '  %d. Download the models for the features you want (into %s):\n' "$n" "$MODELS"
+  note "scripts/models.sh starter    songs, covers and pictures (about 28 GB)"
+  note "scripts/models.sh video      Living Album Covers and music videos (41 GB more)"
   n=$((n + 1))
   printf '  %d. In the app, Settings: sign in to ChatGPT or Grok, add MCP servers, and choose who does what.\n' "$n"
   note "Settings are in sv.env; after changing it: systemctl --user restart sv-app"
