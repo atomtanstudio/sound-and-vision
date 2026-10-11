@@ -1,0 +1,29 @@
+[project]
+name = "soundandvision-server"
+version = "0.1.0"
+description = "Sound / Vision: the app's server on Legion (API, scheduler, ComfyUI client, providers, MCP)"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.120",
+  "uvicorn[standard]>=0.38",
+  "httpx>=0.28",
+  "websockets>=15",
+  "pydantic>=2.12",
+  "numpy>=2.0",
+  "python-multipart>=0.0.20",
+  "pillow>=12.3.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.4", "pytest-asyncio>=1.2"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sv"]

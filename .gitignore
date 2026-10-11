@@ -1,0 +1,47 @@
+# the install's own settings and data
+sv.env
+/data/
+/models/
+scripts/deploy.env
+**/secrets/
+token
+*.token
+api-token
+
+# builds and environments
+node_modules/
+dist/
+/build/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# media, weights and logs: never in the repo
+*.wav
+*.flac
+*.mp3
+*.m4a
+*.mp4
+*.mov
+*.safetensors
+*.ckpt
+*.pt
+*.db
+*.sqlite
+*.log
+
+# kept locally, not published
+docs/OVERNIGHT.md
+spikes/
+promo/
+
+# editors and OS
+.DS_Store
+.vscode/
+.idea/
+.claude/settings.local.json
+.env
+.env.*
+!sv.env.example

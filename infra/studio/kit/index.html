@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Film</title>
+<link rel="icon" href="data:,">
+<script type="importmap">
+{ "imports": {
+  "three": "/node_modules/three/build/three.module.js",
+  "three/addons/": "/node_modules/three/examples/jsm/",
+  "harfbuzzjs": "/node_modules/harfbuzzjs/dist/index.mjs"
+} }
+</script>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #060606; color: #e9e6dc; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; }
+  #stage { position: absolute; inset: 0 0 56px 0; display: grid; place-items: center; }
+  body.render #stage { inset: 0; display: block; }
+  canvas#view { max-width: 100%; max-height: 100%; aspect-ratio: 16 / 9; background: #000; display: block; }
+  body.render canvas#view { max-width: none; max-height: none; }
+  #bar { position: absolute; left: 0; right: 0; bottom: 0; height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 18px; box-sizing: border-box; background: #0b0a0a; border-top: 1px solid #221d1b; }
+  body.render #bar { display: none; }
+  button { all: unset; cursor: pointer; width: 34px; height: 34px; border-radius: 50%; background: #3a3632; display: grid; place-items: center; color: #f2e8d5; font-size: 13px; }
+  button:focus-visible { outline: 2px solid #f2e8d5; outline-offset: 2px; }
+  input[type=range] { flex: 1; accent-color: #b8b0a4; }
+  #time { min-width: 250px; text-align: right; font-variant-numeric: tabular-nums; opacity: .8; }
+  #msg { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; letter-spacing: .2em; text-transform: uppercase; opacity: .7; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="view"></canvas></div>
+<div id="msg">loading…</div>
+<div id="bar">
+  <button id="play" aria-label="Play / pause">▶</button>
+  <input id="seek" type="range" min="0" max="1" step="0.01" value="0" aria-label="Seek">
+  <div id="time"></div>
+</div>
+<audio id="audio" src="/song/song.m4a" preload="auto"></audio>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+.mi-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.mi-head h1 {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.mi-head p {
+  margin: 8px 0 0;
+  max-width: 560px;
+  color: var(--text-2);
+}
+.mi .hm-recent {
+  margin-top: 34px;
+}
+.mi-soon {
+  margin-top: 22px;
+  color: var(--text-3);
+}
+.mi-wide {
+  max-width: 1320px;
+}
+.mi-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.mi-bar h2 {
+  margin: 0;
+}
+.mi-count {
+  margin-left: 8px;
+  color: var(--text-4);
+  font-weight: 500;
+}
+.mi-tools {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.mi-search {
+  width: 240px;
+}
+
+/* ---- songs as album art ---- */
+.sv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 26px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sv-card {
+  display: grid;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+.sv-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  margin-bottom: 6px;
+  overflow: hidden;
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.sv-card:hover .sv-art {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-2);
+}
+.sv-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sv-noart {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 46px;
+  font-weight: 700;
+  color: var(--text-4);
+  background: var(--surface-3);
+}
+.sv-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.sv-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.sv-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--ink-on);
+  font-size: 14px;
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.18s, transform 0.18s;
+  cursor: pointer;
+}
+.sv-card:hover .sv-play,
+.sv-row:hover .sv-play,
+.sv-play.on,
+.sv-play:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---- songs as a list ---- */
+.sv-list {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+.sv-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 2.2fr) minmax(0, 1.6fr) 110px 70px 110px;
+  gap: 14px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.sv-row:hover,
+.sv-row:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+.sv-row-head {
+  padding-top: 0;
+  font-size: 11px;
+  color: var(--text-4);
+  cursor: default;
+}
+.sv-row-head:hover {
+  background: none;
+}
+.sv-thumb {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+.sv-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sv-thumb .sv-noart {
+  font-size: 20px;
+}
+.sv-thumb .sv-play {
+  inset: 0;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: rgb(0 0 0 / 0.5);
+  color: #fff;
+  transform: none;
+  box-shadow: none;
+}
+.sv-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sv-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 14px;
+}
+.sv-name span,
+.sv-style {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+}
+.sv-num,
+.sv-when {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .sv-row {
+    grid-template-columns: 48px minmax(0, 1fr) 60px;
+  }
+  .sv-row > :nth-child(3),
+  .sv-row > :nth-child(4),
+  .sv-row > :nth-child(6) {
+    display: none;
+  }
+  .sv-thumb {
+    width: 48px;
+    height: 48px;
+  }
+  .mi-search {
+    width: 100%;
+  }
+}

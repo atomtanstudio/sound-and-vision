@@ -1,0 +1,65 @@
+# sv-comfy: Sound / Vision's ComfyUI, used only through its API.
+#   setup.sh (next to this file) builds the image and fills $SV_COMFY_ROOT/deploy, then there: docker compose up -d
+# Paths, address, port, image and user come from .env in this folder (setup.sh writes it) or the environment; the
+# defaults are Legion's.
+# Flags follow the VRGDG instance's findings on the 5090 (deploy/README there):
+# estimate-based loading (--disable-dynamic-vram) so a 1080p H3 refine pass doesn't
+# run out of memory, and 2 GB held back for the app's renders.
+name: sv
+
+services:
+  comfy:
+    image: ${SV_COMFY_IMAGE:-sv-comfy:0.39-c9d8a6e}
+    container_name: sv-comfy
+    restart: unless-stopped
+    gpus: all
+    shm_size: "8gb"
+    user: "${SV_UID:-1000}:${SV_GID:-1000}"
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    ports:
+      # 0.0.0.0: every address of this machine (the home network too); 127.0.0.1 for this machine only
+      - "${SV_COMFY_BIND:-0.0.0.0}:${SV_COMFY_PORT:-8210}:8210"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      HOME: /sv/cache/home
+      XDG_CACHE_HOME: /sv/cache
+      HF_HOME: /sv/cache/hf
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      TORCHINDUCTOR_CACHE_DIR: /sv/cache/torchinductor
+      TRITON_CACHE_DIR: /sv/cache/triton
+    volumes:
+      # the models folder, read-only; inside the container it is always /srv/ai/models (extra_model_paths.yaml, and the
+      # VRGDG skill's scripts, use that path)
+      - type: bind
+        source: ${SV_MODELS:-/srv/ai/models}
+        target: /srv/ai/models
+        read_only: true
+      - type: bind
+        source: ${SV_COMFY_ROOT:-/srv/ai/sv/comfy}/deploy
+        target: /sv/deploy
+        read_only: true
+      - ${SV_COMFY_ROOT:-/srv/ai/sv/comfy}/profile:/sv/profile
+      - ${SV_COMFY_ROOT:-/srv/ai/sv/comfy}/cache:/sv/cache
+    working_dir: /opt/ComfyUI
+    entrypoint: ["/opt/venv/bin/python", "main.py"]
+    command:
+      - --base-directory=/sv/profile
+      - --extra-model-paths-config=/sv/deploy/extra_model_paths.yaml
+      - --listen=0.0.0.0
+      - --port=8210
+      - --disable-auto-launch
+      - --disable-api-nodes
+      - --disable-pinned-memory
+      - --preview-method=none
+      - --reserve-vram=2
+      - --disable-dynamic-vram
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8210/system_stats >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    stop_grace_period: 2m

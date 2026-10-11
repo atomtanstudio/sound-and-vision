@@ -1,0 +1,9 @@
+{
+  "name": "Dream pop",
+  "kind": "Style",
+  "recommended": 0.5,
+  "max": 0.8,
+  "about": "Hazy, shimmering, reverb-washed guitars and soft vocals. Trained on your dream pop set. 0.5 is a good start; past 0.7 it can drown the words.",
+  "trigger": "sv_dreampop",
+  "source": "AI-Toolkit sv_dreampop_yue2_s1000_v1 (both branches)"
+}

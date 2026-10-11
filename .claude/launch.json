@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "web"
+      ],
+      "port": 5480
+    },
+    {
+      "name": "web-test",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "SV_SERVER=http://127.0.0.1:7671",
+        "npm",
+        "run",
+        "dev",
+        "--prefix",
+        "web",
+        "--",
+        "--port",
+        "5481"
+      ],
+      "port": 5481
+    }
+  ]
+}

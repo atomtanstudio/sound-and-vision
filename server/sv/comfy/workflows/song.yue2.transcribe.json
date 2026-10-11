@@ -1,0 +1,70 @@
+{
+  "id": "song.yue2.transcribe",
+  "title": "YuE2 cover: the song's melody, written down",
+  "model": "yue2",
+  "params": {
+    "audio": {
+      "to": [
+        [
+          "load",
+          "audio"
+        ]
+      ],
+      "type": "str"
+    },
+    "mode": {
+      "to": [
+        [
+          "abc",
+          "mode"
+        ]
+      ],
+      "type": "str",
+      "default": "melody",
+      "choices": [
+        "melody",
+        "full"
+      ]
+    }
+  },
+  "outputs": {
+    "text": "show"
+  },
+  "graph": {
+    "load": {
+      "class_type": "LoadAudio",
+      "inputs": {
+        "audio": ""
+      }
+    },
+    "enc": {
+      "class_type": "AudioEncoderLoader",
+      "inputs": {
+        "audio_encoder_name": "sheetsage2_bf16.safetensors"
+      }
+    },
+    "abc": {
+      "class_type": "SheetSage2AudioToABC",
+      "inputs": {
+        "audio_encoder": [
+          "enc",
+          0
+        ],
+        "audio": [
+          "load",
+          0
+        ],
+        "mode": "melody"
+      }
+    },
+    "show": {
+      "class_type": "PreviewAny",
+      "inputs": {
+        "source": [
+          "abc",
+          0
+        ]
+      }
+    }
+  }
+}

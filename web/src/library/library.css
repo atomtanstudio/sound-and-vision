@@ -1,0 +1,581 @@
+/* ---- the Library: folders on the left, a masonry of songs and videos on the right ---- */
+.lib {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 32px;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 34px 28px 120px;
+}
+.lib-side {
+  position: sticky;
+  top: 84px;
+  align-self: start;
+  display: grid;
+  gap: 16px;
+}
+.lib-side h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.lib-folders {
+  display: grid;
+  gap: 2px;
+}
+.lib-folders-h {
+  margin: 14px 0 4px 10px;
+  font-size: 11px;
+  color: var(--text-4);
+}
+.lib-folder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: 9px;
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+.lib-folder.on {
+  background: var(--surface-2);
+}
+.lib-folder.over {
+  background: color-mix(in oklab, var(--focus) 18%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--focus);
+}
+.lib-folder .in {
+  margin: 2px 0;
+}
+.lib-folder-open {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.lib-folder.on .lib-folder-open {
+  color: var(--text);
+  font-weight: 600;
+}
+.lib-folder-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: var(--text-4);
+}
+.lib-folder.on .lib-folder-icon {
+  color: var(--text-2);
+}
+.lib-folders-gap {
+  height: 10px;
+}
+.lib-folder-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-folder-n {
+  color: var(--text-4);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.lib-folder-acts {
+  display: none;
+  gap: 2px;
+  padding-right: 6px;
+}
+.lib-folder:hover .lib-folder-acts {
+  display: flex;
+}
+.lib-folder:hover .lib-folder-n {
+  display: none;
+}
+.lib-folder-acts button {
+  height: 24px;
+  padding: 0 6px;
+  font: 600 11.5px var(--ui);
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.lib-folder-acts button:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.lib-newfolder {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line-3);
+  border-radius: 9px;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.lib-newfolder:hover {
+  color: var(--text);
+  border-color: var(--text-3);
+}
+.lib-tip {
+  margin: 0;
+  color: var(--text-4);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.lib-main {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+.lib-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.lib-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.lib-head p {
+  margin: 2px 0 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.lib-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.lib-search {
+  width: 240px;
+}
+.lib-sort {
+  width: auto;
+}
+.lib-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lib-kind {
+  padding: 5px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.lib-kind.on {
+  border-color: var(--focus);
+  background: color-mix(in oklab, var(--focus) 16%, transparent);
+  color: var(--text);
+}
+.lib-masonry {
+  display: flex;
+  align-items: flex-start;
+}
+.lib-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lib-tile {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+.lib-pic {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.lib-tile:hover .lib-pic {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.lib-tile.picked .lib-pic {
+  box-shadow: 0 0 0 2px var(--focus), var(--shadow-2);
+}
+.lib-pic img,
+.lib-pic video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lib-noart {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 44px;
+  font-weight: 700;
+  color: var(--text-4);
+  background: var(--surface-3);
+}
+.lib-badge,
+.lib-len {
+  position: absolute;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.58);
+  backdrop-filter: blur(6px);
+  color: #f2f2f4;
+  font-size: 11px;
+  font-weight: 600;
+}
+.lib-badge {
+  top: 9px;
+  right: 9px;
+}
+.lib-badge::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  background: var(--c-song);
+}
+.lib-living::before {
+  background: var(--c-picture);
+}
+.lib-motion::before {
+  background: var(--c-graphics);
+}
+.lib-music::before {
+  background: var(--c-video);
+}
+.lib-len {
+  bottom: 9px;
+  right: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.lib-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgb(0 0 0 / 0.5);
+  opacity: 0;
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+.lib-tile:hover .lib-check,
+.lib-tile.picked .lib-check {
+  opacity: 1;
+}
+.lib-check input {
+  accent-color: var(--focus);
+  cursor: pointer;
+}
+.lib-cap {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0 2px;
+}
+.lib-cap div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.lib-cap strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+.lib-cap span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.lib-more svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  vertical-align: middle;
+}
+.lib-more {
+  flex: none;
+  width: 28px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-3);
+  font-size: 16px;
+  cursor: pointer;
+}
+.lib-more:hover,
+.lib-more[aria-expanded="true"] {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.lib-menu {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 210px;
+  padding: 5px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+}
+.lib-menu button,
+.lib-menu a {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lib-menu button:hover,
+.lib-menu a:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+@media (max-width: 820px) {
+  .lib {
+    grid-template-columns: 1fr;
+    padding: 24px 16px 120px;
+  }
+  .lib-side {
+    position: static;
+  }
+  .lib-search {
+    width: 100%;
+  }
+}
+
+/* ---- the thumbnail maker ---- */
+.tm {
+  display: grid;
+  gap: 16px;
+}
+.tm-frames {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  grid-template-areas: "video pick" "video strip";
+  gap: 10px 16px;
+  align-items: start;
+}
+.tm-frames video {
+  grid-area: video;
+  width: 100%;
+  max-height: 260px;
+  border-radius: var(--r-2);
+  background: #000;
+}
+.tm-pick {
+  grid-area: pick;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.tm-strip {
+  grid-area: strip;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.tm-cand {
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  cursor: pointer;
+}
+.tm-cand.on {
+  border-color: var(--focus);
+}
+.tm-cand img {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+}
+.tm-done {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  border-radius: var(--r-2);
+  background: color-mix(in oklab, var(--c-song) 10%, var(--surface));
+}
+.tm-done img {
+  width: 220px;
+  border-radius: 8px;
+}
+@media (max-width: 820px) {
+  .tm-frames {
+    grid-template-columns: 1fr;
+    grid-template-areas: "video" "pick" "strip";
+  }
+}
+.lib-clip::before {
+  background: var(--c-sound);
+}
+
+/* ---- picking many: the box, the tiles, the bar ---- */
+.lib-main.choosing {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.lib-tile.choosing .lib-check {
+  opacity: 1;
+}
+.lib-tile.choosing .lib-pic {
+  cursor: default;
+}
+.lib-tile.choosing:hover .lib-pic {
+  transform: none;
+}
+.lib-tile.choosing:not(.picked) .lib-pic img {
+  opacity: 0.82;
+}
+.lib-tile.picked .lib-pic {
+  box-shadow: 0 0 0 2px var(--text), var(--shadow-2);
+}
+.lib-box {
+  position: absolute;
+  z-index: 40;
+  border: 1px solid var(--text-2);
+  background: color-mix(in oklab, var(--text) 8%, transparent);
+  pointer-events: none;
+}
+.lib-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 16px;
+  border-radius: var(--r-2);
+  border: 1px solid var(--line-3);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  transform: translateX(-50%);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.lib-bar-n {
+  color: var(--text-2);
+  margin-right: 6px;
+}
+.lib-bar-n b {
+  color: var(--text);
+  font-weight: 700;
+}
+.lib-bar-gap {
+  width: 10px;
+}
+.lib-bar-move {
+  position: relative;
+}
+.lib-bar-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  min-width: 220px;
+  max-height: 50vh;
+  overflow: auto;
+  padding: 6px;
+  border-radius: var(--r-2);
+  border: 1px solid var(--line-3);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+}
+.lib-bar-menu button {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lib-bar-menu button:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+.lib-bar-menu button:disabled {
+  color: var(--text-4);
+  cursor: default;
+}
+.lib-bar-menu hr {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.lib-bar-menu .in {
+  margin: 2px 0;
+}
+.lib-bar-sure {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+}
+.lib-menu .lib-menu-del {
+  color: var(--bad);
+}
+@media (max-width: 760px) {
+  .lib-bar {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}

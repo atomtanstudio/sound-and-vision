@@ -1,0 +1,11 @@
+# The ComfyUI node packs sv-comfy runs, pinned. The Dockerfile checks each out under /opt/ComfyUI/custom_nodes (and
+# applies the patch from patches/ when one is named); setup.sh copies them into the profile, where ComfyUI loads them.
+# These are the VRGDG H3 instance's working checkouts on Legion, checked file by file against these commits.
+#
+# name                                url                                                              commit                                    patch
+comfyui-vrgamedevgirl                 https://github.com/vrgamegirl19/comfyui-vrgamedevgirl.git          3432b03f3d4bf5431120080d3f6dae8882006b07
+comfyui-minimax-h3-audio-T8           https://github.com/T8mars/comfyui-minimax-h3-audio-T8.git          8b7408e4b927b07b076b48b26f43adeb0a22613a
+Comfyui_Minimax_h3_latent_Upscaler    https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler.git 40316cf008b2fd8663263270669eb4da23f89d2c
+TE-Speed-MiniMaxH3-OSS                https://github.com/HELPMEEADICE/TE-Speed-MiniMaxH3-OSS.git          c1dacf47bc02cb9326f7b93c69280529b93d391b
+ComfyUI-KJNodes                       https://github.com/kijai/ComfyUI-KJNodes.git                       195d312a251efdc484c3d9c4570914ab2da9da54  ComfyUI-KJNodes-minimax.patch
+ComfyUI-VideoHelperSuite              https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git         4ee72c065db22c9d96c2427954dc69e7b908444b

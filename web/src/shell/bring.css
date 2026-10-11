@@ -1,0 +1,131 @@
+/* ---- Bring a song ---- */
+.br {
+  display: grid;
+  gap: 14px;
+  width: min(560px, 100%);
+}
+.br-lead {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.br-drop {
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  padding: 26px 16px;
+  border-radius: var(--r-3);
+  border: 1.5px dashed var(--line-3);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  text-align: center;
+}
+.br-drop strong {
+  color: var(--text);
+  font-size: 15px;
+  word-break: break-word;
+}
+.br-drop span {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.br-drop.over,
+.br-drop:hover {
+  border-color: var(--c-song);
+}
+.br-drop.has {
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--c-song) 55%, var(--line));
+}
+.br-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.br-field {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.br-field > span:first-child {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.br-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.br-file {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--r-2);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.br-file input {
+  display: none;
+}
+.br-file:hover {
+  border-color: var(--line-3);
+}
+.br-progress {
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.br-go {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+}
+@media (max-width: 520px) {
+  .br-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Make: cover a song ---- */
+.cv-src {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+}
+.cv-ref {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+}
+.cv-ref strong {
+  font-size: 14px;
+}
+.cv-ref span {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.cv-ref audio {
+  width: 100%;
+  height: 32px;
+}
+.cv-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cv-pick select {
+  flex: 1;
+  min-width: 180px;
+}

@@ -1,0 +1,23 @@
+# Sound / Vision as a systemd user service. scripts/install.sh (or scripts/deploy.sh) fills in @SERVER@ (the server
+# folder) and @ENV@ (the install's sv.env) and puts this in ~/.config/systemd/user/sv-app.service.
+[Unit]
+Description=Sound / Vision: API, scheduler, interface
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=@SERVER@
+Environment=SV_PORT=7660
+EnvironmentFile=@ENV@
+Environment=PYTHONUNBUFFERED=1
+# on every address, so the browsers on your network can reach it; SV_OPEN_NETWORKS says who needs no key.
+# Open live connections (every window keeps one) must not hold a restart: 5 s, then they're closed.
+ExecStart=@SERVER@/.venv/bin/uvicorn sv.app:app --host 0.0.0.0 --port ${SV_PORT} --timeout-graceful-shutdown 5
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+# stop the app first so it can put running jobs back in the queue; workers it started (MOSS, ffmpeg) go after
+KillMode=mixed
+
+[Install]
+WantedBy=default.target

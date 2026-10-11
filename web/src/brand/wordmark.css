@@ -1,0 +1,42 @@
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(4em / 17);
+  font: 800 1em/1 var(--ui);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: var(--ink);
+  user-select: none;
+}
+
+.wordmark svg {
+  width: calc(12em / 17);
+  height: calc(20em / 17);
+  margin: 0 calc(1em / 17);
+  overflow: visible;
+}
+
+/* On first paint the bars slide in, one after another, like faders coming up. */
+.wordmark-animate rect {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: wm-bar 0.7s var(--ease-pop) both;
+  animation-delay: calc(0.15s + var(--i) * 0.06s);
+}
+
+@keyframes wm-bar {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark-animate rect {
+    animation: none;
+  }
+}

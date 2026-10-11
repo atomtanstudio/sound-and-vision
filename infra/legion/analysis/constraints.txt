@@ -1,0 +1,9 @@
+# Keep sv-comfy's Torch build (CUDA 13, sm120) and its core numerics; everything else may resolve.
+torch==2.11.0+cu130
+torchaudio==2.11.0+cu130
+torchvision==0.26.0+cu130
+numpy==2.4.4
+scipy==1.18.0
+transformers==5.14.1
+ctranslate2==4.8.2
+triton==3.6.0

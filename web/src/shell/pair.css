@@ -1,0 +1,40 @@
+.pr {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.pr-card {
+  display: grid;
+  gap: 14px;
+  width: min(460px, 100%);
+  padding: 32px;
+  border-radius: var(--r-4);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+.pr-card h1 {
+  margin: 10px 0 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.pr-card p,
+.pr-card ol {
+  margin: 0;
+  color: var(--text-2);
+}
+.pr-card ol {
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.pr-card code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--bg-sunk);
+  font: 12.5px var(--mono);
+}
+.pr-key {
+  font-family: var(--mono);
+}

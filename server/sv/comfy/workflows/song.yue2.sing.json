@@ -1,0 +1,266 @@
+{
+  "id": "song.yue2.sing",
+  "title": "YuE2: sing the song (from its sketch, or freely)",
+  "model": "yue2",
+  "params": {
+    "style": {
+      "to": [
+        [
+          "music",
+          "style"
+        ]
+      ],
+      "type": "str"
+    },
+    "lyrics": {
+      "to": [
+        [
+          "music",
+          "lyrics"
+        ]
+      ],
+      "type": "str"
+    },
+    "abc": {
+      "to": [
+        [
+          "music",
+          "abc"
+        ]
+      ],
+      "type": "str",
+      "default": ""
+    },
+    "seed": {
+      "to": [
+        [
+          "music",
+          "seed"
+        ],
+        [
+          "sample",
+          "seed"
+        ]
+      ],
+      "type": "int",
+      "default": 0
+    },
+    "plan": {
+      "to": [
+        [
+          "music",
+          "mode"
+        ]
+      ],
+      "type": "str",
+      "default": "full",
+      "choices": [
+        "full",
+        "melody"
+      ]
+    },
+    "seconds": {
+      "to": [
+        [
+          "music",
+          "max_duration"
+        ]
+      ],
+      "type": "float",
+      "default": 360.0,
+      "min": 5,
+      "max": 900
+    },
+    "temperature": {
+      "to": [
+        [
+          "music",
+          "temperature"
+        ]
+      ],
+      "type": "float",
+      "default": 1.0,
+      "min": 0.05,
+      "max": 2.0
+    },
+    "top_p": {
+      "to": [
+        [
+          "music",
+          "top_p"
+        ]
+      ],
+      "type": "float",
+      "default": 0.95,
+      "min": 0.05,
+      "max": 1.0
+    },
+    "top_k": {
+      "to": [
+        [
+          "music",
+          "top_k"
+        ]
+      ],
+      "type": "int",
+      "default": 100,
+      "min": 1,
+      "max": 5000
+    },
+    "repetition_penalty": {
+      "to": [
+        [
+          "music",
+          "repetition_penalty"
+        ]
+      ],
+      "type": "float",
+      "default": 1.2,
+      "min": 1.0,
+      "max": 2.0
+    },
+    "guidance": {
+      "to": [
+        [
+          "music",
+          "cfg_scale"
+        ]
+      ],
+      "type": "float",
+      "required": false,
+      "min": 0.0,
+      "max": 20.0
+    },
+    "steps": {
+      "to": [
+        [
+          "sample",
+          "steps"
+        ]
+      ],
+      "type": "int",
+      "default": 32,
+      "min": 8,
+      "max": 128
+    }
+  },
+  "influences": {
+    "model": [
+      "ckpt",
+      0
+    ],
+    "clip": [
+      "ckpt",
+      1
+    ]
+  },
+  "outputs": {
+    "audio": "save",
+    "seconds": "seconds"
+  },
+  "graph": {
+    "ckpt": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "yue2_3b_bf16.safetensors"
+      }
+    },
+    "music": {
+      "class_type": "YuE2GenerateMusic",
+      "inputs": {
+        "clip": [
+          "ckpt",
+          1
+        ],
+        "style": "",
+        "lyrics": "",
+        "abc": "",
+        "seed": 0,
+        "mode": "full",
+        "max_duration": 240.0,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 100,
+        "repetition_penalty": 1.2
+      }
+    },
+    "neg": {
+      "class_type": "ConditioningZeroOut",
+      "inputs": {
+        "conditioning": [
+          "music",
+          0
+        ]
+      }
+    },
+    "latent": {
+      "class_type": "EmptyYuE2LatentAudio",
+      "inputs": {
+        "seconds": [
+          "music",
+          1
+        ],
+        "batch_size": 1
+      }
+    },
+    "sample": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "ckpt",
+          0
+        ],
+        "positive": [
+          "music",
+          0
+        ],
+        "negative": [
+          "neg",
+          0
+        ],
+        "latent_image": [
+          "latent",
+          0
+        ],
+        "seed": 0,
+        "steps": 32,
+        "cfg": 1.0,
+        "sampler_name": "dpm_2",
+        "scheduler": "sgm_uniform",
+        "denoise": 1.0
+      }
+    },
+    "decode": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "sample",
+          0
+        ],
+        "vae": [
+          "ckpt",
+          2
+        ]
+      }
+    },
+    "save": {
+      "class_type": "SaveAudio",
+      "inputs": {
+        "audio": [
+          "decode",
+          0
+        ],
+        "filename_prefix": "sv/song"
+      }
+    },
+    "seconds": {
+      "class_type": "PreviewAny",
+      "inputs": {
+        "source": [
+          "music",
+          1
+        ]
+      }
+    }
+  }
+}

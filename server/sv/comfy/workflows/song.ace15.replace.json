@@ -1,0 +1,302 @@
+{
+  "id": "song.ace15.replace",
+  "title": "ACE-Step 1.5: replace a stretch of a song",
+  "model": "ace15",
+  "params": {
+    "style": {
+      "to": [
+        [
+          "enc",
+          "tags"
+        ]
+      ],
+      "type": "str"
+    },
+    "lyrics": {
+      "to": [
+        [
+          "enc",
+          "lyrics"
+        ]
+      ],
+      "type": "str",
+      "default": ""
+    },
+    "seconds": {
+      "to": [
+        [
+          "enc",
+          "duration"
+        ]
+      ],
+      "type": "float",
+      "default": 180.0,
+      "min": 5,
+      "max": 600
+    },
+    "seed": {
+      "to": [
+        [
+          "enc",
+          "seed"
+        ],
+        [
+          "sample",
+          "seed"
+        ]
+      ],
+      "type": "int",
+      "default": 0
+    },
+    "bpm": {
+      "to": [
+        [
+          "enc",
+          "bpm"
+        ]
+      ],
+      "type": "int",
+      "default": 120,
+      "min": 30,
+      "max": 300
+    },
+    "key": {
+      "to": [
+        [
+          "enc",
+          "keyscale"
+        ]
+      ],
+      "type": "str",
+      "default": "C major"
+    },
+    "time_signature": {
+      "to": [
+        [
+          "enc",
+          "timesignature"
+        ]
+      ],
+      "type": "str",
+      "default": "4",
+      "choices": [
+        "2",
+        "3",
+        "4",
+        "6"
+      ]
+    },
+    "language": {
+      "to": [
+        [
+          "enc",
+          "language"
+        ]
+      ],
+      "type": "str",
+      "default": "en"
+    },
+    "source": {
+      "to": [
+        [
+          "load",
+          "audio"
+        ]
+      ],
+      "type": "str"
+    },
+    "start": {
+      "to": [
+        [
+          "mask",
+          "start_s"
+        ]
+      ],
+      "type": "float",
+      "min": 0
+    },
+    "end": {
+      "to": [
+        [
+          "mask",
+          "end_s"
+        ]
+      ],
+      "type": "float",
+      "min": 0
+    },
+    "strength": {
+      "to": [
+        [
+          "sample",
+          "denoise"
+        ]
+      ],
+      "type": "float",
+      "default": 1.0,
+      "min": 0.1,
+      "max": 1.0
+    }
+  },
+  "influences": {
+    "model": [
+      "unet",
+      0
+    ],
+    "clip": [
+      "clip",
+      0
+    ]
+  },
+  "outputs": {
+    "audio": "save"
+  },
+  "graph": {
+    "unet": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "ace_step_1.5/acestep_v1.5_xl_turbo_bf16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "shift": {
+      "class_type": "ModelSamplingAuraFlow",
+      "inputs": {
+        "model": [
+          "unet",
+          0
+        ],
+        "shift": 3.0
+      }
+    },
+    "clip": {
+      "class_type": "DualCLIPLoader",
+      "inputs": {
+        "clip_name1": "ace_step_1.5/qwen_0.6b_ace15.safetensors",
+        "clip_name2": "ace_step_1.5/qwen_1.7b_ace15.safetensors",
+        "type": "ace",
+        "device": "default"
+      }
+    },
+    "vae": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "ace_step_1.5/ace_1.5_vae.safetensors"
+      }
+    },
+    "enc": {
+      "class_type": "TextEncodeAceStepAudio1.5",
+      "inputs": {
+        "clip": [
+          "clip",
+          0
+        ],
+        "tags": "",
+        "lyrics": "",
+        "seed": 0,
+        "bpm": 120,
+        "duration": 120.0,
+        "timesignature": "4",
+        "language": "en",
+        "keyscale": "C major",
+        "generate_audio_codes": true,
+        "cfg_scale": 2.0,
+        "temperature": 0.85,
+        "top_p": 0.9,
+        "top_k": 0,
+        "min_p": 0.0
+      }
+    },
+    "neg": {
+      "class_type": "ConditioningZeroOut",
+      "inputs": {
+        "conditioning": [
+          "enc",
+          0
+        ]
+      }
+    },
+    "decode": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "sample",
+          0
+        ],
+        "vae": [
+          "vae",
+          0
+        ]
+      }
+    },
+    "save": {
+      "class_type": "SaveAudio",
+      "inputs": {
+        "audio": [
+          "decode",
+          0
+        ],
+        "filename_prefix": "sv/song"
+      }
+    },
+    "load": {
+      "class_type": "LoadAudio",
+      "inputs": {
+        "audio": ""
+      }
+    },
+    "encode": {
+      "class_type": "VAEEncodeAudio",
+      "inputs": {
+        "audio": [
+          "load",
+          0
+        ],
+        "vae": [
+          "vae",
+          0
+        ]
+      }
+    },
+    "mask": {
+      "class_type": "SVAudioRangeMask",
+      "inputs": {
+        "samples": [
+          "encode",
+          0
+        ],
+        "start_s": 0.0,
+        "end_s": 10.0,
+        "fade_s": 0.5,
+        "latent_fps": 25.0
+      }
+    },
+    "sample": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "shift",
+          0
+        ],
+        "positive": [
+          "enc",
+          0
+        ],
+        "negative": [
+          "neg",
+          0
+        ],
+        "latent_image": [
+          "mask",
+          0
+        ],
+        "seed": 0,
+        "steps": 8,
+        "cfg": 1.0,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1.0
+      }
+    }
+  }
+}

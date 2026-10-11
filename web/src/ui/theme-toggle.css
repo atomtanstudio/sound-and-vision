@@ -1,0 +1,269 @@
+/* The day/night switch. Sizes come from --tt-h so it scales as one piece. */
+.tt {
+  --tt-h: 34px;
+  --tt-w: calc(var(--tt-h) * 2);
+  --tt-pad: 3px;
+  --tt-k: calc(var(--tt-h) - var(--tt-pad) * 2);
+  --tt-travel: calc(var(--tt-w) - var(--tt-k) - var(--tt-pad) * 2 - 2px);
+  --roll: 0.75s;
+
+  position: relative;
+  flex: none;
+  width: var(--tt-w);
+  height: var(--tt-h);
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tt-sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.tt-day,
+.tt-night {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.6s ease;
+}
+.tt-day {
+  background:
+    radial-gradient(120% 140% at 18% 30%, rgb(255 236 170 / 0.55), transparent 55%),
+    linear-gradient(180deg, #7cc8ff 0%, #4a9fe8 100%);
+}
+.tt-night {
+  opacity: 0;
+  background:
+    radial-gradient(90% 120% at 82% 25%, rgb(120 140 255 / 0.28), transparent 60%),
+    linear-gradient(180deg, #0a0f2c 0%, #182251 100%);
+}
+
+/* Stars: hidden by day; at night they pop in one by one, then twinkle forever. */
+.tt-star {
+  position: absolute;
+  fill: #fffbe8;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  filter: drop-shadow(0 0 2px rgb(255 250 220 / 0.9));
+  transition:
+    transform 0.45s var(--ease-pop),
+    opacity 0.3s ease;
+}
+
+/* A star that shoots across now and then (only at night). */
+.tt-shoot {
+  position: absolute;
+  top: 18%;
+  left: 8%;
+  width: 16px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, #fffbe8);
+  opacity: 0;
+  transform: rotate(18deg);
+}
+
+/* Clouds: two soft puffs drifting on the day side (right of the sun). */
+.tt-cloud {
+  position: absolute;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgb(30 80 140 / 0.25);
+  transition:
+    transform 0.6s var(--ease-land),
+    opacity 0.4s ease;
+}
+.tt-cloud::before,
+.tt-cloud::after {
+  content: "";
+  position: absolute;
+  background: inherit;
+  border-radius: 50%;
+}
+.tt-cloud-a {
+  right: 9px;
+  top: 9px;
+  width: 16px;
+  height: 6px;
+  animation: tt-drift 7s ease-in-out infinite alternate;
+}
+.tt-cloud-a::before {
+  width: 8px;
+  height: 8px;
+  left: 2px;
+  top: -4px;
+}
+.tt-cloud-a::after {
+  width: 6px;
+  height: 6px;
+  left: 8px;
+  top: -2.5px;
+}
+.tt-cloud-b {
+  right: 18px;
+  bottom: 7px;
+  width: 11px;
+  height: 4px;
+  opacity: 0.85;
+  animation: tt-drift 9s ease-in-out -3s infinite alternate-reverse;
+}
+.tt-cloud-b::before {
+  width: 6px;
+  height: 6px;
+  left: 1.5px;
+  top: -3px;
+}
+.tt-cloud-b::after {
+  width: 4px;
+  height: 4px;
+  left: 6px;
+  top: -2px;
+}
+
+@keyframes tt-drift {
+  from {
+    translate: -2px 0;
+  }
+  to {
+    translate: 3px 0;
+  }
+}
+
+/* The knob: the sun by day, rolling right into the moon. */
+.tt-knob {
+  position: absolute;
+  top: var(--tt-pad);
+  left: var(--tt-pad);
+  width: var(--tt-k);
+  height: var(--tt-k);
+  border-radius: 50%;
+  transition: transform var(--roll) var(--ease-pop);
+}
+.tt-knob svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  /* the glow sits on the whole knob so it follows the crescent's shape */
+  filter: drop-shadow(0 0 4px rgb(255 196 60 / 0.85));
+  transition: filter 0.5s ease;
+}
+
+.tt-disc {
+  fill: #ffd34e;
+  transition: fill 0.5s ease;
+}
+.tt-rays line {
+  stroke: #ffd34e;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.tt-rays {
+  transform-origin: 20px 20px;
+  transition:
+    transform 0.5s var(--ease-land),
+    opacity 0.35s ease;
+}
+.tt-bite {
+  transition: transform var(--roll) var(--ease-land);
+}
+.tt-craters circle {
+  fill: #c9c6d8;
+  opacity: 0;
+  transition: opacity 0.4s ease 0.25s;
+}
+
+.tt:hover .tt-rays {
+  transform: rotate(22deg) scale(1.08);
+}
+
+/* ——— Night ——— */
+.tt[data-dark="true"] .tt-day {
+  opacity: 0;
+}
+.tt[data-dark="true"] .tt-night {
+  opacity: 1;
+}
+.tt[data-dark="true"] .tt-knob {
+  transform: translateX(var(--tt-travel)) rotate(360deg);
+}
+.tt[data-dark="true"] .tt-disc {
+  fill: #eeedf6;
+}
+.tt[data-dark="true"] .tt-knob svg {
+  filter: drop-shadow(0 0 5px rgb(190 205 255 / 0.6));
+}
+.tt[data-dark="true"] .tt-rays {
+  transform: scale(0.2);
+  opacity: 0;
+}
+.tt[data-dark="true"] .tt-bite {
+  transform: translate(-12px, -1px);
+}
+.tt[data-dark="true"] .tt-craters circle {
+  opacity: 1;
+}
+.tt[data-dark="true"] .tt-star {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  transition-delay: var(--pop);
+  animation: tt-twinkle var(--tw) ease-in-out calc(var(--pop) + 0.5s + var(--ph)) infinite;
+}
+.tt[data-dark="true"] .tt-shoot {
+  animation: tt-shoot 7s ease-in 2.5s infinite;
+}
+.tt[data-dark="true"] .tt-cloud {
+  transform: translateY(16px);
+  opacity: 0;
+  animation-play-state: paused;
+}
+.tt[data-dark="true"]:hover .tt-knob {
+  transform: translateX(var(--tt-travel)) rotate(375deg);
+}
+
+@keyframes tt-twinkle {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(0.45) rotate(45deg);
+    opacity: 0.45;
+  }
+}
+
+@keyframes tt-shoot {
+  0%,
+  86% {
+    opacity: 0;
+    translate: 0 0;
+  }
+  89% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: 26px 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tt {
+    --roll: 0.01s;
+  }
+  .tt *,
+  .tt *::before,
+  .tt *::after {
+    animation: none !important;
+    transition-duration: 0.01s !important;
+    transition-delay: 0s !important;
+  }
+}

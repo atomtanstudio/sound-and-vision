@@ -1,0 +1,277 @@
+/* ---- the look editor: the picture on the left, its parts' settings on the right ---- */
+.lk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 22px;
+  align-items: start;
+}
+.lk-stage {
+  display: grid;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+}
+.mod-full .lk {
+  --lk-h: 62vh;
+}
+.lk-canvas {
+  display: block;
+  margin: 0 auto;
+  border-radius: var(--r-2);
+  background: #000;
+  box-shadow: var(--shadow-2);
+  touch-action: none;
+  outline: none;
+}
+.lk-canvas:focus-visible {
+  box-shadow: var(--shadow-2), 0 0 0 2px var(--focus);
+}
+.lk-stagebar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.lk-hint {
+  margin-left: auto;
+  color: var(--text-4);
+}
+.lk-side {
+  display: grid;
+  gap: 14px;
+  max-height: 78vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+.lk-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lk-part {
+  padding: 5px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.lk-part.on {
+  border-color: color-mix(in oklab, var(--focus) 70%, var(--line-2));
+  background: color-mix(in oklab, var(--focus) 16%, var(--surface));
+  color: var(--text);
+  font-weight: 600;
+}
+.lk-group {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+}
+.lk-group h4 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.lk-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.lk-check {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.lk-check input {
+  accent-color: var(--focus);
+}
+.lk-field,
+.lk-words label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.lk-words {
+  display: grid;
+  gap: 8px;
+}
+.lk-place {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.lk-anchor {
+  display: grid;
+  grid-template-columns: repeat(3, 18px);
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+}
+.lk-anchor button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  cursor: pointer;
+}
+.lk-anchor button.on {
+  background: var(--focus);
+  border-color: var(--focus);
+}
+.lk-px {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+}
+.lk-px label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.lk-px span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.lk-px input {
+  width: 70px;
+  text-align: right;
+}
+.lk-color {
+  width: 36px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.lk-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  position: sticky;
+  bottom: 0;
+  padding-top: 8px;
+  background: linear-gradient(transparent, var(--surface-2) 30%);
+}
+@media (max-width: 900px) {
+  .lk {
+    grid-template-columns: 1fr;
+  }
+  .lk-stage {
+    position: static;
+  }
+  .lk-side {
+    max-height: none;
+  }
+}
+
+/* ---- the Brand page ---- */
+.bp-sec {
+  display: grid;
+  gap: 14px;
+  margin-top: 30px;
+}
+.bp-sec h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.bp-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.bp-tools {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.bp-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--r-2);
+  background: color-mix(in oklab, var(--c-song) 12%, var(--surface));
+  color: var(--text-2);
+  font-size: 13px;
+}
+.bp-now {
+  margin-top: -4px;
+}
+.bp-logos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.bp-logo {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+}
+.bp-logo-pic {
+  display: grid;
+  place-items: center;
+  height: 110px;
+  border-radius: 8px;
+  /* a checkerboard, so a transparent logo shows its edges */
+  background: repeating-conic-gradient(#2a2d35 0 25%, #1c1f25 0 50%) 0 0 / 16px 16px;
+}
+.bp-logo-pic img {
+  max-width: 85%;
+  max-height: 85%;
+  object-fit: contain;
+}
+.bp-logo-acts {
+  display: flex;
+  gap: 6px;
+}
+.bp-add-pic {
+  color: var(--text-3);
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px dashed var(--line-3);
+  background: var(--surface-2);
+}
+.bp-tools .in {
+  width: auto;
+  min-width: 200px;
+}
+.bp-tools .seg {
+  flex-wrap: nowrap;
+}
+
+.lk-name label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.lk-name .la-note {
+  margin: 6px 0 0;
+}

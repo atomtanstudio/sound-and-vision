@@ -1,0 +1,849 @@
+/* ---- Video: choosing a song ---- */
+.vd-sec {
+  margin-top: 34px;
+}
+.vd-sec h2 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text);
+}
+.vd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+.vd-song {
+  display: grid;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.vd-song img,
+.vd-nocover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--r-2);
+  object-fit: cover;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.2s var(--ease-land);
+}
+.vd-nocover {
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.vd-song:hover img {
+  transform: translateY(-2px);
+}
+.vd-song strong {
+  font-size: 15px;
+}
+.vd-song span {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.vd-waiting {
+  margin-top: 18px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.vd-waiting a {
+  color: var(--text-2);
+}
+/* ---- one song's video ---- */
+.vs {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 24px 120px;
+}
+.vs-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+.vs-cover {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-1);
+}
+.vs-title {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 200px;
+}
+.vs-title h1 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+.vs-title a {
+  color: var(--text-3);
+  font-size: 13px;
+  text-decoration: none;
+}
+.vs-title a:hover {
+  color: var(--text);
+}
+.vs-kinds {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.vs-kind {
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--text-4);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.vs-kind.on {
+  background: color-mix(in oklab, var(--c-picture) 18%, var(--surface-2));
+  color: var(--text);
+  font-weight: 650;
+}
+.vs-need {
+  color: var(--text-2);
+}
+
+/* ---- Living Album Cover ---- */
+.la {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+  gap: 28px;
+  align-items: start;
+}
+.la-monitor {
+  position: sticky;
+  top: 84px;
+  display: grid;
+  gap: 10px;
+}
+.la-frame {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  background: #000;
+  box-shadow: var(--shadow-2);
+}
+.la-frame video,
+.la-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.la-frame .la-layer {
+  pointer-events: none;
+}
+.la-caption {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.la-pick {
+  display: flex;
+  gap: 6px;
+}
+.la-pick button {
+  width: 34px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text-2);
+  font-weight: 700;
+  cursor: pointer;
+}
+.la-pick button.on {
+  border-color: var(--c-picture);
+  color: var(--text);
+  background: color-mix(in oklab, var(--c-picture) 16%, var(--surface));
+}
+.la-pick button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.la-side {
+  display: grid;
+  gap: 14px;
+}
+.la-step {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--r-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.la-step h3 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-size: 15px;
+}
+.la-step-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.la-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.la-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.la-check strong {
+  color: var(--text-2);
+}
+.la-check input {
+  margin-top: 2px;
+  accent-color: var(--c-picture);
+}
+.la-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.la-risk {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-2);
+  background: color-mix(in oklab, var(--c-graphics) 12%, transparent);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.la-loops {
+  display: grid;
+  gap: 10px;
+}
+.la-loop {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+}
+.la-loop-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.la-letter {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--c-picture) 22%, var(--surface-3));
+  font-weight: 800;
+  font-size: 13px;
+}
+.la-thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #000;
+}
+.la-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.la-state {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.la-state em {
+  color: var(--c-graphics);
+  font-style: normal;
+}
+.la-loop.st-ready .la-state {
+  color: var(--text-2);
+}
+.la-go {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+.la-go span {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.la-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.la-bar i {
+  display: block;
+  height: 100%;
+  background: var(--c-picture);
+  transition: width 0.6s var(--ease-land);
+}
+.la-renders {
+  display: grid;
+  gap: 12px;
+}
+.la-render {
+  display: grid;
+  gap: 8px;
+}
+.la-render video {
+  width: 100%;
+  border-radius: var(--r-2);
+  background: #000;
+}
+.la-render.sh-story video {
+  max-height: 520px;
+  object-fit: contain;
+}
+.la-render-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.la-render-meta strong {
+  color: var(--text);
+}
+.la-render-meta a {
+  margin-left: auto;
+  color: var(--c-song);
+  font-weight: 650;
+  text-decoration: none;
+}
+.sp-step-link {
+  text-decoration: none;
+  color: inherit;
+}
+.sp-step-link:hover {
+  color: var(--text);
+}
+@media (max-width: 900px) {
+  .la {
+    grid-template-columns: 1fr;
+  }
+  .la-monitor {
+    position: static;
+  }
+}
+
+/* ---- the three steps ---- */
+.la-flow {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text-4);
+}
+.la-flow li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px 4px 4px;
+  border-radius: 8px;
+}
+.la-flow li span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+.la-flow li.on {
+  color: var(--text);
+  font-weight: 650;
+  background: color-mix(in oklab, var(--c-picture) 16%, transparent);
+}
+.la-flow li.on span {
+  border-color: var(--c-picture);
+  color: var(--c-picture);
+}
+.la-flow li.done {
+  color: var(--text-2);
+}
+.la-flow li.done span {
+  border-color: transparent;
+  background: color-mix(in oklab, var(--c-song) 45%, transparent);
+  color: var(--text);
+}
+.la-now {
+  border-color: var(--line-2);
+}
+.kt-state code,
+.la-note code {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  font: 0.92em var(--mono);
+}
+.la-locked {
+  opacity: 0.55;
+}
+.la-done {
+  gap: 4px;
+}
+.la-lead {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.la-tight {
+  margin-top: -4px;
+}
+.la-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 0;
+  color: var(--text-4);
+  font-size: 12px;
+}
+.la-or::before,
+.la-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.la-form {
+  display: grid;
+  gap: 8px;
+}
+.la-make {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.la-earlier {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.la-earlier div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.la-earlier button {
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #000;
+}
+.la-earlier button:hover {
+  border-color: var(--c-picture);
+}
+.la-earlier img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.la-steer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.la-steer .in {
+  flex: 1;
+  min-width: 0;
+}
+.la-working {
+  position: absolute;
+  inset: auto 12px 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--r-2);
+  background: color-mix(in oklab, var(--bg) 82%, transparent);
+  backdrop-filter: blur(8px);
+  font-size: 13.5px;
+  z-index: 2;
+}
+.la-making {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.la-others {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.la-render.small .la-render-meta {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 520px) {
+  .la-steer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .la-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+.la-loop-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+}
+.la-mini {
+  font-size: 12px;
+  align-items: center;
+}
+.la-warn {
+  color: var(--c-graphics);
+  font-size: 12px;
+}
+.la-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-4);
+  font-size: 14px;
+}
+
+/* ---- Claude makes it ---- */
+.la-auto h3 {
+  font-size: 16px;
+}
+.la-idea {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--r-2);
+  background: color-mix(in oklab, var(--c-picture) 10%, var(--surface-2));
+}
+.la-idea > p:first-child {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.la-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.la-chips span {
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
+  color: var(--text-2);
+  font-size: 12px;
+}
+.la-progress {
+  display: grid;
+  gap: 10px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.la-progress li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--text-4);
+  font-size: 13.5px;
+}
+.la-progress li > div {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.la-progress li span:not(.la-dot):not(.ln-spin) {
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+.la-progress li.on,
+.la-progress li.done {
+  color: var(--text);
+}
+.la-progress li strong {
+  font-weight: 600;
+}
+.la-dot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line-3);
+  font-size: 11px;
+}
+.la-progress li.done .la-dot {
+  border-color: transparent;
+  background: color-mix(in oklab, var(--c-song) 45%, transparent);
+}
+.la-progress li.on .la-dot {
+  border-color: var(--c-picture);
+}
+.la-progress li.on .la-dot .ln-spin {
+  width: 12px;
+  height: 12px;
+}
+.la-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.la-kept {
+  margin: 0;
+  color: var(--c-song);
+  font-weight: 650;
+  font-size: 14px;
+}
+.la-frame video.la-final {
+  object-fit: contain;
+}
+.la-stopped {
+  display: grid;
+  gap: 8px;
+}
+.la-left {
+  color: var(--c-graphics);
+}
+
+/* ---- kinds of video ---- */
+button.vs-kind {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+button.vs-kind:hover:not(.on) {
+  color: var(--text-2);
+}
+.vs-later {
+  opacity: 0.6;
+}
+
+/* ---- Motion Graphics (the "kinetic" film) ---- */
+.kt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+  gap: 28px;
+  align-items: start;
+}
+.kt-monitor {
+  position: sticky;
+  top: 84px;
+  display: grid;
+  gap: 10px;
+}
+.kt-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  background: #000;
+  box-shadow: var(--shadow-2);
+}
+.kt-frame.sh-story {
+  aspect-ratio: 9 / 16;
+  max-height: 72vh;
+  justify-self: center;
+}
+.kt-frame.sh-square {
+  aspect-ratio: 1;
+}
+.kt-frame video,
+.kt-frame img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.kt-empty {
+  display: grid;
+  place-items: center;
+  color: var(--text-4);
+  font-size: 14px;
+  padding: 20px;
+  text-align: center;
+}
+.kt-stills {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.kt-stills img {
+  width: 100%;
+  border-radius: 6px;
+  background: #000;
+}
+.kt-side {
+  display: grid;
+  gap: 14px;
+}
+.kt-who {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.kt-now {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+.kt-lines {
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+}
+.kt-lines p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.kt-concept,
+.kt-reply {
+  margin: 0;
+  padding: 12px;
+  border-radius: var(--r-2);
+  background: var(--surface-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-height: 420px;
+  overflow: auto;
+}
+.kt-versions {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+@media (max-width: 900px) {
+  .kt {
+    grid-template-columns: 1fr;
+  }
+  .kt-monitor {
+    position: static;
+  }
+}
+
+/* ---- Music Video: the three kinds ---- */
+.mv-kinds {
+  display: grid;
+  gap: 6px;
+}
+.mv-kind {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+}
+.mv-kind strong {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+.mv-kind em {
+  padding: 1px 7px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  color: var(--text-4);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+}
+.mv-kind.on {
+  border-color: color-mix(in oklab, var(--c-video) 60%, var(--line));
+  background: color-mix(in oklab, var(--c-video) 12%, var(--surface));
+}
+.mv-kind.on strong {
+  color: var(--text);
+}
+.mv-kind:disabled {
+  opacity: 0.6;
+}
+.kt-linkbtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.mv-first {
+  display: grid;
+  gap: 8px;
+}
+.mv-first .la-note {
+  margin: 0;
+}

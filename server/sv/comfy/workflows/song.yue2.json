@@ -1,0 +1,224 @@
+{
+  "id": "song.yue2",
+  "title": "YuE2: a song from style and lyrics",
+  "model": "yue2",
+  "params": {
+    "style": {
+      "to": [
+        [
+          "abc",
+          "style"
+        ],
+        [
+          "music",
+          "style"
+        ]
+      ],
+      "type": "str"
+    },
+    "lyrics": {
+      "to": [
+        [
+          "abc",
+          "lyrics"
+        ],
+        [
+          "music",
+          "lyrics"
+        ]
+      ],
+      "type": "str"
+    },
+    "seconds": {
+      "to": [
+        [
+          "music",
+          "max_duration"
+        ]
+      ],
+      "type": "float",
+      "default": 240.0,
+      "min": 5,
+      "max": 900
+    },
+    "seed": {
+      "to": [
+        [
+          "abc",
+          "seed"
+        ],
+        [
+          "music",
+          "seed"
+        ],
+        [
+          "sample",
+          "seed"
+        ]
+      ],
+      "type": "int",
+      "default": 0
+    },
+    "plan": {
+      "to": [
+        [
+          "abc",
+          "mode"
+        ],
+        [
+          "music",
+          "mode"
+        ]
+      ],
+      "type": "str",
+      "default": "full",
+      "choices": [
+        "full",
+        "melody"
+      ]
+    },
+    "creativity": {
+      "to": [
+        [
+          "music",
+          "temperature"
+        ]
+      ],
+      "type": "float",
+      "default": 1.0,
+      "min": 0.1,
+      "max": 2.0
+    }
+  },
+  "influences": {
+    "model": [
+      "ckpt",
+      0
+    ],
+    "clip": [
+      "ckpt",
+      1
+    ]
+  },
+  "outputs": {
+    "audio": "save"
+  },
+  "graph": {
+    "ckpt": {
+      "class_type": "CheckpointLoaderSimple",
+      "inputs": {
+        "ckpt_name": "yue2_3b_bf16.safetensors"
+      }
+    },
+    "abc": {
+      "class_type": "YuE2GenerateABC",
+      "inputs": {
+        "clip": [
+          "ckpt",
+          1
+        ],
+        "style": "",
+        "lyrics": "",
+        "seed": 0,
+        "mode": "full",
+        "max_abc_tokens": 8192,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "top_k": 30,
+        "repetition_penalty": 1.005,
+        "penalty_window": 100
+      }
+    },
+    "music": {
+      "class_type": "YuE2GenerateMusic",
+      "inputs": {
+        "clip": [
+          "ckpt",
+          1
+        ],
+        "style": "",
+        "lyrics": "",
+        "abc": [
+          "abc",
+          0
+        ],
+        "seed": 0,
+        "mode": "full",
+        "max_duration": 240.0,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 100,
+        "repetition_penalty": 1.2
+      }
+    },
+    "neg": {
+      "class_type": "ConditioningZeroOut",
+      "inputs": {
+        "conditioning": [
+          "music",
+          0
+        ]
+      }
+    },
+    "latent": {
+      "class_type": "EmptyYuE2LatentAudio",
+      "inputs": {
+        "seconds": [
+          "music",
+          1
+        ],
+        "batch_size": 1
+      }
+    },
+    "sample": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "ckpt",
+          0
+        ],
+        "positive": [
+          "music",
+          0
+        ],
+        "negative": [
+          "neg",
+          0
+        ],
+        "latent_image": [
+          "latent",
+          0
+        ],
+        "seed": 0,
+        "steps": 32,
+        "cfg": 1.0,
+        "sampler_name": "dpm_2",
+        "scheduler": "sgm_uniform",
+        "denoise": 1.0
+      }
+    },
+    "decode": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "sample",
+          0
+        ],
+        "vae": [
+          "ckpt",
+          2
+        ]
+      }
+    },
+    "save": {
+      "class_type": "SaveAudio",
+      "inputs": {
+        "audio": [
+          "decode",
+          0
+        ],
+        "filename_prefix": "sv/song"
+      }
+    }
+  }
+}

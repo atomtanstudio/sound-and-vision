@@ -1,0 +1,321 @@
+.hm {
+  position: relative;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 56px 24px 96px;
+}
+
+.hm-hero h1 {
+  margin: 0;
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+.hm-hero p {
+  margin: 14px 0 0;
+  max-width: 560px;
+  font-size: 17px;
+  color: var(--text-2);
+}
+
+.hm-doors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 40px;
+}
+
+.hm-door {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  min-height: 280px;
+  padding: 26px;
+  border-radius: var(--r-4);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.hm-door:hover {
+  border-color: var(--line-3);
+}
+.hm-door h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.hm-door-text {
+  padding-right: 56px;
+}
+.hm-door p {
+  margin: 8px 0 0;
+  max-width: 400px;
+  color: var(--text-2);
+}
+.hm-go {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--ink-on);
+  font-size: 18px;
+  font-weight: 700;
+  transition: transform 0.2s ease;
+}
+.hm-door:hover .hm-go {
+  transform: translateX(3px);
+}
+
+/* Song: level bars breathing in the song lane colour. */
+.hm-bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 120px;
+}
+.hm-bars span {
+  flex: 1;
+  height: calc(var(--h) * 100%);
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--lane), color-mix(in oklab, var(--lane) 35%, transparent));
+  transform-origin: center;
+  animation: hm-level 1.6s ease-in-out var(--d) infinite alternate;
+}
+@keyframes hm-level {
+  from {
+    transform: scaleY(0.35);
+    opacity: 0.55;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* Video for your song: a vocal line, its words, and a playhead lighting them. */
+.hm-sweep {
+  --dur: 5s;
+  position: relative;
+  height: 120px;
+}
+.hm-words {
+  position: relative;
+  height: 34px;
+}
+.hm-words span {
+  position: absolute;
+  left: var(--at);
+  top: 4px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-3);
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  animation: hm-word var(--dur) linear infinite;
+  animation-delay: calc(var(--dur) * var(--k) / 8 - var(--dur) * 0.02);
+}
+@keyframes hm-word {
+  0% {
+    color: var(--ink-on);
+    background: var(--c-lyrics);
+    border-color: transparent;
+    transform: translateY(-3px);
+  }
+  10% {
+    color: var(--text-2);
+    background: color-mix(in oklab, var(--c-lyrics) 22%, var(--surface-3));
+    transform: none;
+  }
+  85%,
+  100% {
+    color: var(--text-3);
+    background: var(--surface-3);
+  }
+}
+.hm-vocal {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 70px;
+  margin-top: 10px;
+}
+.hm-vocal span {
+  flex: 1;
+  height: calc(var(--h) * 100%);
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--lane) 70%, transparent);
+}
+.hm-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--text);
+  animation: hm-play var(--dur) linear infinite;
+}
+@keyframes hm-play {
+  from {
+    left: 0;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+.hm-kinds {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+.hm-kind {
+  position: relative;
+  padding: 18px;
+  border-radius: var(--r-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+button.hm-kind {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+button.hm-kind:hover {
+  border-color: var(--line-2);
+}
+button.hm-kind.on {
+  border-color: color-mix(in oklab, var(--lane) 55%, var(--line));
+  background: color-mix(in oklab, var(--lane) 6%, var(--surface));
+}
+.hm-kind-slash {
+  margin-right: 7px;
+  color: var(--lane);
+  font-weight: 800;
+}
+.hm-kind h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.hm-kind p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--text-3);
+}
+
+.hm-recent {
+  margin-top: 56px;
+}
+.hm-recent h2 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text);
+}
+.hm-empty {
+  padding: 36px;
+  border-radius: var(--r-3);
+  border: 1px dashed var(--line-2);
+  color: var(--text-3);
+  text-align: center;
+}
+
+@media (max-width: 820px) {
+  .hm-doors,
+  .hm-kinds {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-bars span,
+  .hm-words span,
+  .hm-playhead {
+    animation: none;
+  }
+}
+
+.hm-starting {
+  opacity: 0.7;
+  pointer-events: none;
+}
+.hm-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hm-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--r-3);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.2s, transform 0.35s var(--ease-pop);
+}
+.hm-item:hover {
+  border-color: var(--line-3);
+  transform: translateY(-2px);
+}
+.hm-item-art {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--text-3);
+}
+.hm-item-text {
+  display: grid;
+  min-width: 0;
+}
+.hm-item-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hm-item-text span {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.hm-item-img {
+  object-fit: cover;
+  padding: 0;
+}
+.hm-hero h1 {
+  text-align: left;
+}

@@ -1,0 +1,15 @@
+{
+  "name": "sv-film",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Sound / Vision film written in code (seeded from the studio's film kit)",
+  "type": "module",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "harfbuzzjs": "1.6.2",
+    "opentype.js": "2.0.0",
+    "puppeteer": "25.12.0",
+    "three": "0.186.1",
+    "ws": "8.22.0"
+  }
+}

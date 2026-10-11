@@ -1,0 +1,100 @@
+/* Sound / Vision design tokens. Dark is the default; light redefines the same names.
+   The six colours of the wordmark's slash are also the six lanes of the work:
+   Song, Lyrics, Picture, Video, Graphics, Sound (top to bottom, as in the logo). */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0b0c0f;
+  --bg-sunk: #08090b;
+  --surface: #121419;
+  --surface-2: #171a20;
+  --surface-3: #1e222a;
+  --line: rgb(255 255 255 / 0.07);
+  --line-2: rgb(255 255 255 / 0.12);
+  --line-3: rgb(255 255 255 / 0.2);
+
+  --text: #ececef;
+  --text-2: #b3b5be;
+  --text-3: #80838e;
+  --text-4: #5a5d67;
+
+  --ink: #ececef; /* wordmark and primary button face */
+  --ink-on: #0b0c0f;
+
+  /* the slash, exactly as the brand has it */
+  --wm-1: #4ade80;
+  --wm-2: #e8e1cf;
+  --wm-3: #f5c542;
+  --wm-4: #4d8dff;
+  --wm-5: #ff4d94;
+  --wm-6: #2dd4d8;
+
+  /* lanes (same hues; tuned per theme for contrast) */
+  --c-song: #4ade80;
+  --c-lyrics: #e8e1cf;
+  --c-picture: #f5c542;
+  --c-video: #4d8dff;
+  --c-graphics: #ff4d94;
+  --c-sound: #2dd4d8;
+
+  --focus: #4d8dff;
+  --bad: #ff7a5c;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 8px 30px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.35);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f4f3ef;
+  --bg-sunk: #ebe9e3;
+  --surface: #ffffff;
+  --surface-2: #fafaf8;
+  --surface-3: #f0efea;
+  --line: rgb(16 18 24 / 0.07);
+  --line-2: rgb(16 18 24 / 0.12);
+  --line-3: rgb(16 18 24 / 0.22);
+
+  --text: #14151a;
+  --text-2: #464953;
+  --text-3: #767984;
+  --text-4: #a3a6ae;
+
+  --ink: #14151a;
+  --ink-on: #ffffff;
+
+  --wm-1: #4ade80;
+  --wm-2: #bfae86; /* the cream bar disappears on a light page; a deeper tone of it */
+  --wm-3: #f5c542;
+  --wm-4: #4d8dff;
+  --wm-5: #ff4d94;
+  --wm-6: #2dd4d8;
+
+  --c-song: #17a34a;
+  --c-lyrics: #a8955f;
+  --c-picture: #c99400;
+  --c-video: #2f6fe0;
+  --c-graphics: #e0337a;
+  --c-sound: #0b9ea3;
+
+  --focus: #2f6fe0;
+  --bad: #c43d1d;
+  --shadow-1: 0 1px 2px rgb(16 18 24 / 0.08);
+  --shadow-2: 0 10px 30px rgb(16 18 24 / 0.1), 0 2px 6px rgb(16 18 24 / 0.06);
+}
+
+:root {
+  --ui: "Archivo Variable", "Archivo", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 10px;
+  --r-4: 12px;
+
+  /* springs as CSS curves: "land" settles without overshoot, "pop" overshoots a little */
+  --ease-land: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+}

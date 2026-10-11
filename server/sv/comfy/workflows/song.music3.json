@@ -1,0 +1,188 @@
+{
+  "id": "song.music3",
+  "title": "MiniMax Music 3: a song from a caption and lyrics",
+  "model": "music3",
+  "params": {
+    "style": {
+      "to": [
+        [
+          "enc",
+          "caption"
+        ]
+      ],
+      "type": "str"
+    },
+    "lyrics": {
+      "to": [
+        [
+          "enc",
+          "lyrics"
+        ]
+      ],
+      "type": "str",
+      "default": ""
+    },
+    "seconds": {
+      "to": [
+        [
+          "enc",
+          "max_duration"
+        ]
+      ],
+      "type": "float",
+      "default": 180.0,
+      "min": 5,
+      "max": 360
+    },
+    "seed": {
+      "to": [
+        [
+          "enc",
+          "seed"
+        ],
+        [
+          "sample",
+          "seed"
+        ]
+      ],
+      "type": "int",
+      "default": 0
+    },
+    "guidance": {
+      "to": [
+        [
+          "enc",
+          "cfg_scale"
+        ],
+        [
+          "sample",
+          "cfg"
+        ]
+      ],
+      "type": "float",
+      "default": 1.7,
+      "min": 1.0,
+      "max": 4.0
+    }
+  },
+  "influences": {
+    "model": [
+      "unet",
+      0
+    ],
+    "clip": [
+      "clip",
+      0
+    ]
+  },
+  "outputs": {
+    "audio": "save"
+  },
+  "graph": {
+    "unet": {
+      "class_type": "UNETLoader",
+      "inputs": {
+        "unet_name": "minimax_music3/minimax_music3_dit_fp16.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    "clip": {
+      "class_type": "CLIPLoader",
+      "inputs": {
+        "clip_name": "minimax_music3/minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    "vae": {
+      "class_type": "VAELoader",
+      "inputs": {
+        "vae_name": "minimax_music3/minimax_music3_dav.safetensors"
+      }
+    },
+    "enc": {
+      "class_type": "MiniMaxMusic3TextEncode",
+      "inputs": {
+        "clip": [
+          "clip",
+          0
+        ],
+        "caption": "",
+        "lyrics": "",
+        "seed": 0,
+        "max_duration": 180.0,
+        "cfg_scale": 1.7,
+        "top_k": 50
+      }
+    },
+    "neg": {
+      "class_type": "ConditioningZeroOut",
+      "inputs": {
+        "conditioning": [
+          "enc",
+          0
+        ]
+      }
+    },
+    "latent": {
+      "class_type": "EmptyMiniMaxMusic3LatentAudio",
+      "inputs": {
+        "seconds": [
+          "enc",
+          1
+        ],
+        "batch_size": 1
+      }
+    },
+    "sample": {
+      "class_type": "KSampler",
+      "inputs": {
+        "model": [
+          "unet",
+          0
+        ],
+        "positive": [
+          "enc",
+          0
+        ],
+        "negative": [
+          "neg",
+          0
+        ],
+        "latent_image": [
+          "latent",
+          0
+        ],
+        "seed": 0,
+        "steps": 30,
+        "cfg": 1.7,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1.0
+      }
+    },
+    "decode": {
+      "class_type": "VAEDecodeAudio",
+      "inputs": {
+        "samples": [
+          "sample",
+          0
+        ],
+        "vae": [
+          "vae",
+          0
+        ]
+      }
+    },
+    "save": {
+      "class_type": "SaveAudio",
+      "inputs": {
+        "audio": [
+          "decode",
+          0
+        ],
+        "filename_prefix": "sv/song"
+      }
+    }
+  }
+}

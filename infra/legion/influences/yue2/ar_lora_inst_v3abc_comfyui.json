@@ -1,0 +1,11 @@
+{
+  "name": "Instrumental",
+  "kind": "Style",
+  "hidden": true,
+  "recommended": 1.0,
+  "max": 1.0,
+  "about": "Used by the app for instrumentals: keeps YuE2 from singing.",
+  "source": "YuE2-instrumental-cot-full-loras by Mothersuperior, https://huggingface.co/Mothersuperior/YuE2-instrumental-cot-full-loras (ar_lora_inst_v3abc_comfyui.safetensors, unmodified)",
+  "license": "CC BY-NC 4.0, https://creativecommons.org/licenses/by-nc/4.0/",
+  "sha256": "de6a11d5701df103a191c87dc73115266e2420f3834739319dec5c24d2119f31"
+}

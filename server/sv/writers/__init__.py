@@ -1,0 +1,208 @@
+"""Who does what: each kind of work goes to the provider and model the user chose for it, falling
+down the list when that one isn't connected. Defaults (the user, 2026-10-09): no Grok for now;
+Claude Haiku 5.5 writes lyrics and reads the Home prompt; Claude Opus directs videos. A Claude or ChatGPT step can
+carry its reasoning level ("effort": none means the model's own default; Claude's are low … max, ChatGPT's are the ones
+each model lists). "film" is the long Claude Code session that makes a video in code (a living cover's finish, a
+Motion Graphics film, a music video); only Claude does it.
+
+Pictures have roles too (IMAGE_ROLES): album covers, and the pictures for music videos. Each is one choice of
+image_ids(): ChatGPT's own image tool (under their ChatGPT plan), Krea 2 on the local GPU, or one of the person's own
+MCP servers ("mcp:<id>", which Claude uses to make the picture). An install can also turn on the owner's Mitte
+(SV_MITTE=1: GPT Image 2.5, driven by Claude through the Mitte connector on their Claude account)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from ..config import Config
+from ..mcp import Servers
+from ..store import Store
+from . import tasks
+from .openai import ChatGPT
+from .providers import Claude, Grok, Local, WriterError
+
+TASK_ROLE = {"song": "lyrics", "section": "lyrics", "titles": "lyrics", "sound": "lyrics", "match": "interpret",
+             "interpret": "interpret", "cover": "chores", "research": "research", "motion": "direct", "living": "direct"}
+HAIKU, SONNET, OPUS = "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"
+DEFAULT_WHO = {
+    "interpret": [{"provider": "claude", "model": HAIKU}, {"provider": "claude", "model": SONNET}, {"provider": "local", "model": None}],
+    "lyrics": [{"provider": "claude", "model": HAIKU}, {"provider": "claude", "model": SONNET}, {"provider": "local", "model": None}],
+    "research": [{"provider": "claude", "model": SONNET}, {"provider": "claude", "model": HAIKU}, {"provider": "local", "model": None}],
+    "direct": [{"provider": "claude", "model": OPUS}, {"provider": "local", "model": None}],  # (a local-only install works too)
+    "chores": [{"provider": "claude", "model": HAIKU}, {"provider": "local", "model": None}],
+    "film": [{"provider": "claude", "model": OPUS, "effort": "xhigh"}],  # the user: "extra high" for videos
+}
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+FILM_MODELS = {OPUS: "Opus 5.5", "claude-fable-5-1": "Fable 5.1", SONNET: "Sonnet 5.5"}
+IMAGE_ROLES = {"covers": "Album covers", "scenes": "Pictures for music videos"}
+IMAGE_DEFAULTS = {"covers": [{"provider": "local"}], "scenes": [{"provider": "local"}]}
+MOTION_ROLES = {"motion": "Animating scenes (Surreal music videos)"}
+MITTE_COST = 0.071  # USD a picture (GPT Image 2.5, high, 2K: Mitte's price list, 2026-10)
+ROLE_LABELS = {"interpret": "Reading the Home prompt", "lyrics": "Lyrics, titles and rewrites",
+               "research": "Researching a sound for the Influence Engine", "direct": "Directing videos", "chores": "Small chores (cover prompts, labels)",
+               "film": "Making videos in code (Motion Graphics, living cover finishes)"}
+
+
+class Writers:
+    def __init__(self, cfg: Config, store: Store):
+        accounts = cfg.data / "accounts"
+        self.store = store
+        self.providers = {
+            "grok": Grok(cfg.grok_bin, accounts / "grok-home"),
+            "claude": Claude(cfg.studio_sh, cfg.data / "scratch" / "claude-write"),
+            "local": Local(cfg.ollama, machine=cfg.machine),
+            "openai": ChatGPT(cfg.codex_bin, accounts / "codex-home", cfg.codex_path),
+        }
+        self.machine, self.mitte = cfg.machine, cfg.mitte
+        self.mcp = Servers(cfg.data / "secrets" / "mcp.json")
+
+    def who(self) -> dict[str, list[dict]]:
+        # settings saved before 2026-10-09 put Grok first; the user asked for no Grok for now, so those are dropped
+        saved = {k: v for k, v in (self.store.setting("who") or {}).items() if (k in DEFAULT_WHO or k in IMAGE_ROLES or k in MOTION_ROLES)
+                 and v and not any(step.get("provider") == "grok" for step in v)}
+        images = self.image_defaults()
+        old = (self.store.setting("covers") or {}).get("engine")  # the covers' own switch, before covers had a role
+        if old:
+            images["covers"] = [{"provider": old}]
+        who = {**DEFAULT_WHO, **images, **saved}
+        ids = self.image_ids()
+        for role in IMAGE_ROLES:  # a choice that's gone (a removed server, Mitte turned off) falls back to the GPU
+            if not who.get(role) or who[role][0].get("provider") not in ids:
+                who[role] = images[role]
+        if not who.get("motion") or who["motion"][0].get("provider") not in self.motion_ids():
+            who["motion"] = [{"provider": "local"}]  # H3 on the GPU, unless something else was chosen
+        return who
+
+    def motion_ids(self) -> list[str]:
+        return ["local", *(["mitte"] if self.mitte else []), *(f"mcp:{s['id']}" for s in self.mcp.listed())]
+
+    def motion_by(self) -> str:
+        """Who animates the scenes of a Surreal music video (one of motion_ids())."""
+        return self.who()["motion"][0]["provider"]
+
+    def motion_choices(self, statuses: dict[str, dict] | None = None) -> list[dict]:
+        """What can turn stills into clips, as image_choices() lists pictures."""
+        st = statuses or {}
+        out = [{"id": "local", "name": f"MiniMax H3 on {self.machine}", "cost": 0, "paid": False, **({"connected": True} if st else {}),
+                "note": "On your GPU: free, about 90 seconds a clip."}]
+        if self.mitte:
+            out.append({"id": "mitte", "name": "H3 Max (Mitte)", "cost": 0.2, "paid": True,
+                        **({"connected": bool(st["claude"].get("connected"))} if "claude" in st else {}),
+                        "note": "Hosted H3 through Mitte: much faster; about 20¢ a 5-second clip at 768p (13¢ at 480p)."})
+        for s in self.mcp.listed():
+            out.append({"id": f"mcp:{s['id']}", "name": s["name"], "cost": None, "paid": bool(s.get("paid")),
+                        **({"connected": bool(s.get("ok"))} if st else {}),
+                        "note": "Your MCP server: the model that directs your videos uses its tool that turns a still into video." +
+                                (" It may charge your account, so you're asked first." if s.get("paid") else "")})
+        return out
+
+    def image_defaults(self) -> dict[str, list[dict]]:
+        """The GPU's Krea 2; where the owner turned their Mitte on, that (as it always was there)."""
+        return {role: [{"provider": "mitte"}] for role in IMAGE_ROLES} if self.mitte else dict(IMAGE_DEFAULTS)
+
+    def image_ids(self) -> list[str]:
+        return ["openai", "local", *(["mitte"] if self.mitte else []), *(f"mcp:{s['id']}" for s in self.mcp.listed())]
+
+    def set_who(self, role: str, chain: list[dict]) -> None:
+        cur = self.store.setting("who") or {}
+        if role in IMAGE_ROLES:
+            cur[role] = [{"provider": c["provider"]} for c in chain if c.get("provider") in self.image_ids()][:1]
+        elif role in MOTION_ROLES:
+            cur[role] = [{"provider": c["provider"]} for c in chain if c.get("provider") in self.motion_ids()][:1]
+        elif role in DEFAULT_WHO:
+            cur[role] = [{"provider": c["provider"], "model": c.get("model"),
+                          **({"effort": str(c["effort"])[:20]} if c.get("effort") and (
+                              c["provider"] == "openai" or (c["provider"] == "claude" and c["effort"] in EFFORTS)) else {})}
+                         for c in chain if c.get("provider") in self.providers and (role != "film" or c["provider"] == "claude")]
+        else:
+            return
+        self.store.set_setting("who", cur)
+
+    def image_choices(self, statuses: dict[str, dict] | None = None) -> list[dict]:
+        """What can make pictures: {id, name, note, cost (USD a picture, None if unknown), paid, connected}. Without
+        statuses, `connected` is left out (the connections themselves aren't asked)."""
+        st = statuses or {}
+
+        def on(pid: str) -> dict:
+            return {"connected": bool(st[pid].get("connected"))} if pid in st else {}
+        out = [
+            {"id": "openai", "name": "ChatGPT", "cost": 0, "paid": False, **on("openai"),
+             "note": "ChatGPT's own image tool, on your ChatGPT plan." + ("" if st.get("openai", {}).get("connected", True) else " Sign in above.")},
+            {"id": "local", "name": f"Krea 2 on {self.machine}", "cost": 0, "paid": False, **({"connected": True} if st else {}),
+             "note": "On your GPU: free, and waits its turn behind songs."},
+        ]
+        if self.mitte:
+            out.append({"id": "mitte", "name": "GPT Image 2.5 (Mitte)", "cost": MITTE_COST, "paid": False, **on("claude"),
+                        "note": "Through Mitte on your Claude account; about 7¢ a picture."})
+        for s in self.mcp.listed():
+            out.append({"id": f"mcp:{s['id']}", "name": s["name"], "cost": None, "paid": bool(s.get("paid")),
+                        **({"connected": bool(s.get("ok"))} if st else {}),
+                        "note": "Your MCP server: the model that directs your videos uses its tools to make each picture." +
+                                (" It may charge your account, so you're asked first." if s.get("paid") else "")})
+        return out
+
+    async def connections(self) -> dict[str, Any]:
+        statuses = {k: await p.status() for k, p in self.providers.items()}
+        return {"providers": list(statuses.values()), "who": self.who(), "roles": ROLE_LABELS, "efforts": list(EFFORTS),
+                "filmModels": FILM_MODELS, "imageRoles": IMAGE_ROLES, "imageProviders": self.image_choices(statuses),
+                "motionRoles": MOTION_ROLES, "motionProviders": self.motion_choices(statuses), "mcp": self.mcp.listed()}
+
+    async def doers(self) -> dict[str, Any]:
+        """Who does each job right now, for the interface's wording: the first connected step of each role's chain
+        ({provider, name, model} with a short `name` such as "Claude" or "ChatGPT"), or None when nothing in the chain is
+        connected, so the interface names a model only once one is connected. `filmModels`: the models that can
+        direct videos in code (Claude Code's), with their names."""
+        statuses = {k: await p.status() for k, p in self.providers.items()}
+        short = {"claude": "Claude", "openai": "ChatGPT", "grok": "Grok", "local": "your local model"}
+
+        def label(provider: str, model: str | None) -> str:
+            models = statuses.get(provider, {}).get("models") or []
+            hit = next((m for m in models if m["id"] == model), None) or next((m for m in models if m.get("default")), None)
+            return (hit or {}).get("name") or model or short.get(provider, provider)
+        out: dict[str, Any] = {}
+        for role, chain in self.who().items():
+            if role not in DEFAULT_WHO:
+                continue
+            step = next((c for c in chain if statuses.get(c["provider"], {}).get("connected")), None)
+            out[role] = None if step is None else {
+                "provider": step["provider"], "name": short.get(step["provider"], step["provider"]),
+                "model": label(step["provider"], step.get("model"))}
+        claude = statuses["claude"]
+        return {"roles": out, "plan": "Claude" if claude.get("connected") else None,
+                "filmModels": [{"id": k, "name": f"Claude {v}"} for k, v in FILM_MODELS.items()] if claude.get("connected") else []}
+
+    def picture_by(self, role: str) -> str:
+        """Who makes this role's pictures (one of image_ids())."""
+        return (self.who().get(role) or self.image_defaults()[role])[0]["provider"]
+
+    def film(self) -> dict:
+        """The model and reasoning level for videos made in code (Settings → Who does what)."""
+        step = (self.who().get("film") or DEFAULT_WHO["film"])[0]
+        return {"model": step.get("model") or OPUS, "effort": step.get("effort")}
+
+    async def write(self, task: str, body: dict, provider: str | None = None, model: str | None = None,
+                    images: list | None = None) -> dict:
+        """`images`: pictures the writer looks at (Claude and ChatGPT; the others go by the words)."""
+        if task not in tasks.SCHEMAS:
+            raise WriterError("The writer doesn't know that task.")
+        prompt, schema = tasks.prompt(task, body)
+        chain = [{"provider": provider, "model": model}] if provider else self.who()[TASK_ROLE[task]]
+        tried: list[str] = []
+        for step in chain:
+            p = self.providers.get(step["provider"])
+            if p is None:
+                continue
+            st = await p.status()
+            if not st.get("connected"):
+                tried.append(f"{p.name} isn't connected")
+                continue
+            try:
+                extra = {"images": images, "effort": step.get("effort")} if p.id in ("claude", "openai") else {}
+                data = await p.complete(tasks.system(task), prompt, schema, step.get("model"), **{k: v for k, v in extra.items() if v})
+                return {"result": tasks.read(task, data), "by": {"provider": p.id, "name": p.name, "model": step.get("model")}}
+            except (WriterError, ValueError) as exc:
+                tried.append(f"{p.name}: {exc}")
+        raise WriterError("No writer could do it. " + "; ".join(tried))
+
+
+__all__ = ["Writers", "WriterError"]

@@ -1,0 +1,22 @@
+# The models folder ($SV_MODELS on the host; on Legion the shared store /srv/ai/models), mounted read-only into
+# sv-comfy at /srv/ai/models. Same layout as Legion's lab and VRGDG instances; Sound / Vision adds nothing here
+# (influences live under loras/soundandvision/, written by the app on the host).
+legion_shared_models:
+  base_path: /srv/ai/models/comfyui
+  is_default: true
+  checkpoints: checkpoints
+  clip: clip
+  clip_vision: clip_vision
+  controlnet: controlnet
+  diffusion_models: |
+    diffusion_models
+    unet
+  embeddings: embeddings
+  loras: loras
+  text_encoders: text_encoders
+  upscale_models: upscale_models
+  latent_upscale_models: latent_upscale_models
+  vae: vae
+  vae_approx: vae_approx
+  audio_encoders: audio_encoders
+  model_patches: model_patches

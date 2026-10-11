@@ -1,0 +1,59 @@
+.pbx {
+  position: relative;
+  margin-top: 22px;
+  border-radius: var(--r-4);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color 0.3s,
+    box-shadow 0.4s;
+}
+.pbx:focus-within,
+.pbx-on {
+  border-color: color-mix(in oklab, var(--c-song) 45%, var(--line-2));
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 4px color-mix(in oklab, var(--c-song) 10%, transparent);
+}
+.pbx-text {
+  display: block;
+  width: 100%;
+  min-height: 92px;
+  max-height: 46vh;
+  padding: 20px 22px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 450 17px/1.55 var(--ui);
+  resize: none;
+  field-sizing: content;
+  outline: none;
+}
+.pbx-text::placeholder {
+  color: var(--text-4);
+}
+.pbx-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 12px 22px;
+}
+.pbx-hint {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.pbx-error {
+  margin: 0 22px 14px;
+  color: var(--bad);
+  font-size: 13px;
+}
+@media (max-width: 720px) {
+  .pbx-bar {
+    flex-wrap: wrap;
+  }
+  .pbx-hint {
+    flex-basis: 100%;
+  }
+}
