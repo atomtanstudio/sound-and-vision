@@ -25,7 +25,8 @@ from .openai import ChatGPT
 from .providers import Claude, Grok, Local, WriterError
 
 TASK_ROLE = {"song": "lyrics", "section": "lyrics", "titles": "lyrics", "sound": "lyrics", "match": "interpret",
-             "interpret": "interpret", "cover": "chores", "research": "research", "motion": "direct", "living": "direct"}
+             "interpret": "interpret", "cover": "chores", "research": "research", "captions": "research", "motion": "direct",
+             "living": "direct"}
 HAIKU, SONNET, OPUS = "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"
 DEFAULT_WHO = {
     "interpret": [{"provider": "claude", "model": HAIKU}, {"provider": "claude", "model": SONNET}, {"provider": "local", "model": None}],

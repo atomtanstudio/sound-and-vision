@@ -107,7 +107,7 @@ const HAS_AUDIO = (s: RunSong) => s.source === "library" || s.source === "yours"
 
 function SongRow({ s, finder, editable, onToggle, onAdd }: { s: RunSong; finder: string; editable: boolean; onToggle: () => void; onAdd: (f: File) => void }) {
   const pick = useRef<HTMLInputElement>(null);
-  const state = !s.use && !editable ? "Left out" :
+  const state = !s.use && !editable ? s.note || "Left out" :
     s.state === "ready" ? "Ready" : s.state === "failed" ? s.note || "Couldn't use it" : s.state === "copying" ? "Getting it ready…" :
     s.state === "downloading" ? `Getting it with ${finder}…` :
     s.source === "library" ? "In your music" : s.source === "yours" ? "Added" : s.source === "finder" ? `${finder} will get it` : "Needs its audio";
@@ -439,6 +439,18 @@ export function RunCard({ run }: { run: InfluenceRun }) {
           {error && <p className="ie-err">{error}</p>}
           {!running && run.status !== "training" && (
             <div className="ie-foot">
+              {["choosing", "kept", "failed", "stopped"].includes(run.status) && run.trigger && run.songs.length > 0 && (
+                <Button size="sm" kind="ghost" busy={busy === "again"}
+                  title="A new run with these songs: change the list, then train it again"
+                  onClick={() => void act("again", async () => {
+                    const fresh = await api.post<InfluenceRun>(`/api/influence-runs/${run.id}/again`, {});
+                    useRuns.getState().onRun(fresh);
+                    setTimeout(() => document.getElementById(`run-${fresh.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                    return null;
+                  })}>
+                  Train again with changes
+                </Button>
+              )}
               <Button size="sm" kind="ghost" busy={busy === "del"}
                 onClick={() => { if (confirm("Delete this run? A kept influence stays in your library.")) void act("del", () => api.del(`/api/influence-runs/${run.id}`).then(() => useRuns.getState().onRun({ ...run, deleted: true }))); }}>
                 Delete run

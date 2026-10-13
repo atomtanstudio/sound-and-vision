@@ -8,7 +8,9 @@ anything quoted (MOSS likes to quote a line or two when it describes a song).
 
     venv/bin/python listen.py FOLDER [--only track-001 ...]
 
-One JSON line per song on stdout: {"i", "n", "name", "seconds", "captionChars", "lyricLines", "instrumental"}.
+One JSON line per song on stdout: {"i", "n", "name", "seconds", "captionChars", "lyricLines", "instrumental", "stuck"}.
+"instrumental" means no words were found: the app decides afterwards whether the song really is instrumental. A
+transcription that went round and round on a word or two is thrown away ("stuck").
 """
 
 import argparse
@@ -78,6 +80,16 @@ def tidy_lyrics(text: str) -> str:
     return "\n".join(lines)
 
 
+def stuck(text: str) -> bool:
+    """A transcription that went round and round on a word or two (MOSS does on shouted or distorted singing): not the
+    song's words."""
+    words = [w.lower().strip(",.!?;:'\"") for w in text.split()]
+    if len(words) < 20:
+        return False
+    unique = len(set(words)) / len(words)
+    return unique < 0.1 or (len(words) > 900 and unique < 0.25)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("folder", type=Path)
@@ -95,13 +107,16 @@ def main() -> None:
         side = f.with_suffix(".lyrics.txt")
         published = side.exists() and len(side.read_text(encoding="utf-8").split()) >= MIN_WORDS
         lyrics = side.read_text(encoding="utf-8").strip() if published else tidy_lyrics(ask(model, proc, audio, LYRICS, 1500))
+        went_round = not published and stuck(lyrics)
+        if went_round:
+            lyrics = ""
         instrumental = len(lyrics.split()) < MIN_WORDS
         f.with_suffix(".caption.txt").write_text(caption + "\n", encoding="utf-8")
         if not published:
             side.write_text("" if instrumental else lyrics + "\n", encoding="utf-8")
         print(json.dumps({"i": i, "n": len(files), "name": f.stem, "seconds": round(time.time() - t, 1),
                           "captionChars": len(caption), "lyricLines": 0 if instrumental else lyrics.count("\n") + 1,
-                          "instrumental": instrumental, "published": published}), flush=True)
+                          "instrumental": instrumental, "published": published, "stuck": went_round}), flush=True)
 
 
 if __name__ == "__main__":

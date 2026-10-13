@@ -72,6 +72,47 @@ def lrc_words(text: str) -> str:
     return "\n".join(lines) if len(" ".join(lines).split()) >= 12 else ""
 
 
+def pick_lyrics(hits: list[dict], artist: str, title: str, seconds: float | None) -> dict | None:
+    """Of LRCLIB's answers, the one for this recording: same artist and title, the closest in length (within 15 s when
+    the length is known), with timed words if there's a choice."""
+    same = [h for h in hits if norm(h.get("artistName") or "") == norm(artist) and norm(h.get("trackName") or "") == norm(title)
+            and (h.get("instrumental") or h.get("plainLyrics") or h.get("syncedLyrics"))]
+    if seconds:
+        same = [h for h in same if abs(float(h.get("duration") or 0) - seconds) <= 15]
+    return min(same, key=lambda h: (abs(float(h.get("duration") or 0) - (seconds or 0)), not h.get("syncedLyrics")), default=None)
+
+
+async def lrclib_words(base: str, artist: str, title: str, seconds: float | None) -> tuple[str, bool]:
+    """A song's published words from LRCLIB, an open lyrics database: (words, whether it's listed as instrumental).
+    ("", False) when it isn't there or LRCLIB doesn't answer."""
+    if not base:
+        return "", False
+    try:
+        async with httpx.AsyncClient(timeout=20, headers={"User-Agent": "Sound-Vision (github.com/atomtanstudio/sound-and-vision)"}) as http:
+            r = await http.get(f"{base}/api/search", params={"artist_name": artist, "track_name": title})
+            hits = r.json() if r.status_code == 200 else []
+    except (httpx.HTTPError, ValueError):
+        return "", False
+    hit = pick_lyrics(hits if isinstance(hits, list) else [], artist, title, seconds)
+    if hit is None:
+        return "", False
+    if hit.get("instrumental"):
+        return "", True
+    return lrc_words(hit.get("syncedLyrics") or hit.get("plainLyrics") or ""), False
+
+
+def unnamed(caption: str, artist: str, title: str) -> str:
+    """A caption without any sentence that names the artist or the song (training captions describe the sound)."""
+    names = [n for n in (artist, title, re.sub(r"\s*[(\[].*$", "", title)) if len(n.strip()) >= 4]
+    keep = [x for x in re.split(r"(?<=[.!?])\s+", caption)
+            if not any(re.search(rf"(?<!\w){re.escape(n.strip())}(?!\w)", x, re.I) for n in names)]
+    if keep:
+        return " ".join(keep).strip()
+    for n in names:
+        caption = re.sub(rf"(?<!\w){re.escape(n.strip())}(?!\w)", "this recording", caption, flags=re.I)
+    return caption
+
+
 def file_title(name: str, artist: str) -> str:
     """'03 - Title.m4a', 'Artist - Title.flac', '1-03 Title.mp3' -> 'Title'."""
     stem = name.rsplit(".", 1)[0]
@@ -330,6 +371,26 @@ class Engine:
         run = self.save(run["id"], jobId=job["id"])
         return run
 
+    def again(self, rid: str) -> dict:
+        """A new run with this one's plan and songs, ready to change the list and train again. Each song is gathered,
+        listened to and captioned afresh."""
+        old = self.app.store.run(rid)
+        if old is None or old["status"] not in ("choosing", "kept", "failed", "stopped"):
+            raise JobError("That run can't be trained again now.")
+        if not old.get("trigger") or not old.get("songs"):
+            raise JobError("That run never got as far as choosing its songs.")
+        carry = ("ask", "name", "kind", "trigger", "about", "howMany", "style", "voice", "previewLyrics", "artists",
+                 "researchedBy", "finder", "musicNote")
+        songs = []
+        for x in old["songs"]:
+            song = {k: x[k] for k in ("id", "artist", "title", "album", "seconds", "found", "instead", "path") if k in x}
+            source = x["source"] if x["source"] in ("library", "finder") else "needed"  # audio added to a run stays with it
+            songs.append({**song, "source": source, "use": bool(x.get("use")), "state": "waiting"})
+        run = self.app.store.create_run("planned", {**{k: old[k] for k in carry if k in old}, "songs": songs, "again": rid,
+                                                    "message": "Change the list if you like, then start"})
+        slug, tag = old["trigger"].removeprefix("sv_"), run["id"][-6:]
+        return self.save(run["id"], folder=f"training/sv-{slug}-{tag}", runName=f"sv_{slug}_{tag}")
+
     def start(self, rid: str, drop: list[str] | None = None) -> dict:
         run = self.app.store.run(rid)
         if run is None or run["status"] not in ("planned", "failed", "stopped"):
@@ -489,10 +550,14 @@ class Engine:
                     await lib.fetch(s["path"], src)
                 await self._to_flac(src, folder / f"{s['id']}.flac")
                 (folder / f"{s['id']}.song.txt").write_text(f"{s['artist']} - {s['title']}\n", encoding="utf-8")
-                words = await self._published_lyrics(None if yours else lib, s.get("path"), src, tmp)
+                words, where = await self._published_lyrics(None if yours else lib, s.get("path"), src, tmp)
+                if not words and self.cfg.lrclib:
+                    seconds = await asyncio.to_thread(media.duration, folder / f"{s['id']}.flac", self.cfg.ffmpeg)
+                    words, listed_instrumental = await lrclib_words(self.cfg.lrclib, s["artist"], s["title"], seconds)
+                    where = "lrclib" if words else "lrclib-instrumental" if listed_instrumental else None
                 if words:  # the song's published words beat a transcription; they go only to the sidecar
                     (folder / f"{s['id']}.lyrics.txt").write_text(words + "\n", encoding="utf-8")
-                self.song(rid, s["id"], state="ready", lyricsFrom="published" if words else None, lyricsChecked=True, note=None)
+                self.song(rid, s["id"], state="ready", lyricsFrom=where, lyricsChecked=True, note=None)
             except (JobError, OSError) as exc:
                 self.song(rid, s["id"], state="failed", note=str(exc)[:200])
             finally:
@@ -568,9 +633,9 @@ class Engine:
                     self.song(rid, s["id"], state="failed",
                               note=exc.message[:200] if isinstance(exc, JobError) else f"{name} ran into a problem")
 
-    async def _published_lyrics(self, lib: "Folder | Share | None", path: str | None, audio: Path, tmp: Path) -> str:
+    async def _published_lyrics(self, lib: "Folder | Share | None", path: str | None, audio: Path, tmp: Path) -> tuple[str, str | None]:
         """The words as published: an .lrc beside the file in your music, or a lyrics tag in it. Time stamps and the
-        .lrc's own tags are removed. Empty when there are none."""
+        .lrc's own tags are removed. ("", None) when there are none."""
         text = ""
         lrc = tmp / (audio.stem + ".lrc")
         try:
@@ -586,7 +651,8 @@ class Engine:
             text = out.decode(errors="replace")
         finally:
             lrc.unlink(missing_ok=True)
-        return lrc_words(text)
+        words = lrc_words(text)
+        return words, "published" if words else None
 
     async def _to_flac(self, src: Path, dest: Path) -> None:
         proc = await asyncio.create_subprocess_exec(
@@ -639,15 +705,64 @@ class Engine:
                     continue
                 if "i" in line:
                     heard = line["i"]
-                    self.song(rid, line["name"], instrumental=line["instrumental"], lyricLines=line["lyricLines"])
+                    self.song(rid, line["name"], instrumental=line["instrumental"], lyricLines=line["lyricLines"],
+                              transcriptionStuck=bool(line.get("stuck")))
                     ctx.update(message=f"Listened to {line['i']} of {line['n']}", progress=line["i"] / line["n"])
             err = (await ctx.proc.stderr.read()).decode(errors="replace") if ctx.proc.stderr else ""
             if await ctx.proc.wait() != 0:
                 useful = [l for l in err.splitlines() if l.strip() and "pad_token_id" not in l and "it/s]" not in l]
                 raise JobError("MOSS-Music stopped while listening.", "\n".join(useful)[-3000:])
+        await self._check_captions(ctx, rid)
+        run = ctx.store.run(rid)
+        ready = [s for s in run["songs"] if s.get("use") and (folder / f"{s['id']}.flac").exists()]
+        if len(ready) < 8:
+            raise JobError(f"Only {len(ready)} songs can be trained on; at least 8 are needed. Train again with more songs.")
         job = ctx.sched.submit("influence.train", {"runId": rid})
         self.save(rid, "training", message="Waiting to train", jobId=job["id"], resumeAt="train")
         return {"heard": heard}
+
+    async def _check_captions(self, ctx: Context, rid: str) -> None:
+        """The research writer checks each caption against what it knows of the recording (the listening model gets
+        genres wrong and often calls shouted or distorted singing instrumental) and says whether it's sung. A sung song
+        whose words weren't found is left out: trained as an instrumental, it would teach the sound without its singing.
+        If no writer can do it, the captions stay as they were heard and a song without words is left out when the sound
+        has a voice."""
+        run = ctx.store.run(rid)
+        folder = self.folder(run)
+        songs = [s for s in run["songs"] if s.get("use") and not s.get("captionChecked")
+                 and (folder / f"{s['id']}.flac").exists() and (folder / f"{s['id']}.caption.txt").exists()]
+        if not songs:
+            return
+
+        def has_words(s: dict) -> bool:
+            f = folder / f"{s['id']}.lyrics.txt"
+            return f.exists() and len(f.read_text(encoding="utf-8").split()) >= 12
+
+        verdicts: dict[str, dict] = {}
+        by = None
+        for i in range(0, len(songs), 15):
+            ctx.update(stage="captions", message=f"Checking the captions: {i} of {len(songs)}", progress=i / len(songs))
+            batch = [{"id": s["id"], "artist": s["artist"], "title": s["title"], "words": has_words(s),
+                      "caption": (folder / f"{s['id']}.caption.txt").read_text(encoding="utf-8").strip()} for s in songs[i:i + 15]]
+            try:
+                r = await self.writers.write("captions", {"sound": {"name": run.get("name"), "style": run.get("style")}, "songs": batch})
+            except WriterError as exc:
+                log.warning("Captions weren't checked for run %s: %s", rid, exc)
+                break
+            by = r["by"]
+            verdicts.update({x["id"]: x for x in r["result"]["songs"]})
+        for s in songs:
+            v = verdicts.get(s["id"]) or {}
+            if v.get("caption"):
+                (folder / f"{s['id']}.caption.txt").write_text(unnamed(v["caption"], s["artist"], s["title"]) + "\n", encoding="utf-8")
+            vocals = "instrumental" if s.get("lyricsFrom") == "lrclib-instrumental" else v.get("vocals") or "unsure"
+            if not has_words(s) and (vocals == "sung" or (vocals == "unsure" and run.get("voice"))):
+                for f in folder.glob(f"{s['id']}.*"):
+                    f.unlink()
+                self.song(rid, s["id"], use=False, state="failed", captionChecked=True, vocals=vocals,
+                          note="Sung, but its lyrics weren't found, so it's left out")
+            else:
+                self.song(rid, s["id"], captionChecked=True, vocals=vocals, captionBy=(by or {}).get("name") if v else None)
 
     # ---- train -----------------------------------------------------------------------------
     def graph(self, run: dict) -> dict:

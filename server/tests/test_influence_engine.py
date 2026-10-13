@@ -156,7 +156,7 @@ def _engine(tmp_path, run):
     from sv.influence_engine import Engine
     (tmp_path / "music").mkdir(exist_ok=True)
     cfg = types.SimpleNamespace(music=str(tmp_path / "music"), trainer_root=tmp_path / "trainer", data=tmp_path / "data",
-                                ffmpeg="ffmpeg")
+                                ffmpeg="ffmpeg", lrclib="")
     store = _Store(run)
     app = types.SimpleNamespace(cfg=cfg, store=store, hub=types.SimpleNamespace(publish=lambda *a: None))
     return Engine(app, None), store
@@ -195,7 +195,7 @@ def test_the_song_finder_gets_its_songs_into_your_music_before_they_are_gathered
         dest.write_bytes(src.read_bytes())
 
     async def no_words(self, *a):
-        return ""
+        return "", None
     monkeypatch.setattr(Engine, "_to_flac", to_flac)
     monkeypatch.setattr(Engine, "_published_lyrics", no_words)
     ctx = _Ctx(store, "run2")
@@ -235,7 +235,7 @@ def test_a_run_planned_before_there_was_a_song_finder_gets_its_missing_songs_whe
         dest.write_bytes(src.read_bytes())
 
     async def no_words(self, *a):
-        return ""
+        return "", None
     monkeypatch.setattr(Engine, "_to_flac", to_flac)
     monkeypatch.setattr(Engine, "_published_lyrics", no_words)
     asyncio.run(eng.gather(_Ctx(store, "run4")))
@@ -275,7 +275,7 @@ def test_carrying_on_replaces_what_still_cant_be_found(tmp_path, monkeypatch):
         dest.write_bytes(src.read_bytes())
 
     async def no_words(self, *a):
-        return ""
+        return "", None
     monkeypatch.setattr(Engine, "_to_flac", to_flac)
     monkeypatch.setattr(Engine, "_published_lyrics", no_words)
     asyncio.run(eng.gather(_Ctx(store, "run5")))
@@ -283,3 +283,114 @@ def test_carrying_on_replaces_what_still_cant_be_found(tmp_path, monkeypatch):
     assert not got["Song 7"]["use"] and not got["Song 8"]["use"]
     assert got["Encore"]["instead"] == "Song 7" and got["Finale"]["instead"] == "Song 8"
     assert got["Encore"]["state"] == "ready" and got["Encore"]["source"] == "library"
+
+
+
+# ---- getting the words and the captions right ----------------------------------------------------------------
+
+def test_published_lyrics_are_matched_to_the_recording():
+    from sv.influence_engine import pick_lyrics
+    hits = [{"artistName": "Godflesh", "trackName": "Like Rats", "duration": 360, "plainLyrics": "a", "syncedLyrics": ""},
+            {"artistName": "Godflesh", "trackName": "Like Rats", "duration": 359, "plainLyrics": "b", "syncedLyrics": "[00:01.00] b"},
+            {"artistName": "Godflesh", "trackName": "Like Rats (Live)", "duration": 359, "plainLyrics": "c"},
+            {"artistName": "Someone", "trackName": "Like Rats", "duration": 359, "plainLyrics": "d"},
+            {"artistName": "Godflesh", "trackName": "Like Rats", "duration": 200, "plainLyrics": "e"}]
+    assert pick_lyrics(hits, "Godflesh", "Like Rats", 359.4)["plainLyrics"] == "b"
+    assert pick_lyrics(hits, "Godflesh", "Like Rats", 240) is None  # nothing near its length
+    assert pick_lyrics([], "Godflesh", "Like Rats", None) is None
+
+
+def test_a_caption_never_names_the_artist_or_the_song():
+    from sv.influence_engine import unnamed
+    c = "Industrial metal with a drum machine. Godflesh's Streetcleaner is relentless. Harsh shouted male vocals."
+    assert unnamed(c, "Godflesh", "Streetcleaner") == "Industrial metal with a drum machine. Harsh shouted male vocals."
+    assert "Burn" not in unnamed("Burn is loud.", "Nine Inch Nails", "Burn") and unnamed("Burning synths.", "NIN", "Burn") == "Burning synths."
+
+
+def test_the_writer_s_captions_are_tidied():
+    from sv.writers import tasks as t
+    text, schema = t.prompt("captions", {"sound": {"name": "Industrial metal", "style": "drum machines"},
+                                         "songs": [{"id": "track-001", "artist": "Godflesh", "title": "Pure", "words": True,
+                                                    "caption": "An instrumental thrash track."}]})
+    assert "Godflesh – Pure" in text and "published lyrics were found" in text and schema["required"] == ["songs"]
+    got = t.read("captions", {"songs": [{"id": "track-001", "caption": "Industrial metal, harsh shouted male vocals, drum machine.",
+                                         "vocals": "sung"}, {"id": "track-002", "caption": "too short", "vocals": "sung"},
+                                        {"id": "track-003", "caption": "A slow, droning instrumental built on feedback.", "vocals": "maybe"}]})
+    assert [x["id"] for x in got["songs"]] == ["track-001", "track-003"] and got["songs"][1]["vocals"] == "unsure"
+
+
+def _listened(tmp_path, songs, voice="male"):
+    run = {"id": "run6", "status": "listening", "folder": "training/c", "name": "Industrial metal", "style": "drums",
+           "voice": voice, "songs": songs}
+    eng, store = _engine(tmp_path, run)
+    folder = eng.folder(run)
+    folder.mkdir(parents=True)
+    for s in songs:
+        (folder / f"{s['id']}.flac").write_bytes(b"x")
+        (folder / f"{s['id']}.caption.txt").write_text("A punk rock track with no vocals.\n")
+        (folder / f"{s['id']}.lyrics.txt").write_text(("word " * 30) if s.pop("words", False) else "")
+    return eng, store, folder
+
+
+def test_captions_are_checked_and_a_sung_song_without_its_words_is_left_out(tmp_path):
+    songs = [{"id": "track-001", "artist": "Godflesh", "title": "Pure", "use": True, "words": True},
+             {"id": "track-002", "artist": "Godflesh", "title": "Like Rats", "use": True},
+             {"id": "track-003", "artist": "Ambient Act", "title": "Drift", "use": True},
+             {"id": "track-004", "artist": "Obscure", "title": "B-side", "use": True}]
+    eng, store, folder = _listened(tmp_path, songs)
+    sent = []
+
+    async def write(task, body):
+        sent.append(body)
+        return {"by": {"name": "Claude"}, "result": {"songs": [
+            {"id": "track-001", "caption": "Industrial metal. Pure is great. Harsh shouted male vocals.", "vocals": "sung"},
+            {"id": "track-002", "caption": "Industrial metal, harsh shouted male vocals.", "vocals": "sung"},
+            {"id": "track-003", "caption": "Dark ambient drones, instrumental.", "vocals": "instrumental"},
+            {"id": "track-004", "caption": "Industrial rock.", "vocals": "unsure"}]}}
+    eng.writers = types.SimpleNamespace(write=write)
+    asyncio.run(eng._check_captions(_Ctx(store, "run6"), "run6"))
+    got = {s["id"]: s for s in store.run("run6")["songs"]}
+    assert sent[0]["songs"][0]["words"] is True and sent[0]["songs"][1]["words"] is False
+    assert (folder / "track-001.caption.txt").read_text() == "Industrial metal. Harsh shouted male vocals.\n"
+    assert got["track-001"]["use"] and got["track-001"]["captionChecked"] and got["track-001"]["captionBy"] == "Claude"
+    assert not got["track-002"]["use"] and not (folder / "track-002.flac").exists() and "left out" in got["track-002"]["note"]
+    assert got["track-003"]["use"] and got["track-003"]["vocals"] == "instrumental"  # a real instrumental stays
+    assert not got["track-004"]["use"]  # unsure, in a sung sound: left out
+
+
+def test_without_a_writer_the_captions_stay_and_songs_without_words_go_when_the_sound_is_sung(tmp_path):
+    from sv.writers import WriterError
+    async def write(task, body):
+        raise WriterError("No writer could do it.")
+    songs = [{"id": "track-001", "artist": "A", "title": "One", "use": True, "words": True},
+             {"id": "track-002", "artist": "A", "title": "Two", "use": True}]
+    eng, store, folder = _listened(tmp_path, [dict(x) for x in songs])
+    eng.writers = types.SimpleNamespace(write=write)
+    asyncio.run(eng._check_captions(_Ctx(store, "run6"), "run6"))
+    got = {s["id"]: s for s in store.run("run6")["songs"]}
+    assert got["track-001"]["use"] and not got["track-002"]["use"]
+    assert (folder / "track-001.caption.txt").read_text() == "A punk rock track with no vocals.\n"
+    (tmp_path / "inst").mkdir()
+    eng, store, folder = _listened(tmp_path / "inst", [dict(x) for x in songs], voice=None)
+    eng.writers = types.SimpleNamespace(write=write)
+    asyncio.run(eng._check_captions(_Ctx(store, "run6"), "run6"))
+    assert all(s["use"] for s in store.run("run6")["songs"])  # an instrumental sound keeps them
+
+
+def test_train_again_starts_a_new_run_with_the_same_songs(tmp_path):
+    songs = [{"id": "track-001", "artist": "A", "title": "One", "source": "library", "path": "A/One.flac", "use": True,
+              "state": "ready", "lyricsFrom": "published", "captionChecked": True},
+             {"id": "track-002", "artist": "B", "title": "Two", "source": "yours", "use": True, "state": "ready", "file": "two.mp3"},
+             {"id": "track-003", "artist": "C", "title": "Three", "source": "finder", "found": {"ref": 1}, "use": False, "state": "failed"}]
+    old = {"id": "rold01", "status": "choosing", "trigger": "sv_industrial_metal", "name": "Industrial metal", "style": "x",
+           "voice": "male", "songs": songs, "train": {"status": "complete"}, "folder": "training/sv-industrial_metal-old01"}
+    eng, store = _engine(tmp_path, old)
+    store.create_run = lambda status, doc: (store.runs.__setitem__("rnew002", {"id": "rnew002", "status": status, **doc})
+                                            or store.run("rnew002"))
+    new = eng.again("rold01")
+    assert new["status"] == "planned" and new["again"] == "rold01" and new["name"] == "Industrial metal" and "train" not in new
+    assert new["folder"] == "training/sv-industrial_metal-new002" and new["runName"] == "sv_industrial_metal_new002"
+    got = {s["id"]: s for s in new["songs"]}
+    assert got["track-001"] == {"id": "track-001", "artist": "A", "title": "One", "path": "A/One.flac", "source": "library",
+                                "use": True, "state": "waiting"}
+    assert got["track-002"]["source"] == "needed" and got["track-003"]["found"] == {"ref": 1} and not got["track-003"]["use"]

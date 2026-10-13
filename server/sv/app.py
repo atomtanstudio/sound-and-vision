@@ -1505,6 +1505,16 @@ async def start_run(rid: str, body: StartIn) -> dict:
         raise _err(409, exc.message) from None
 
 
+@app.post("/api/influence-runs/{rid}/again")
+async def run_again(rid: str) -> dict:
+    """Train again: a new run with this one's songs, to change the list first."""
+    _run_or_404(rid)
+    try:
+        return engine.again(rid)
+    except JobError as exc:
+        raise _err(409, exc.message) from None
+
+
 @app.post("/api/influence-runs/{rid}/audio")
 async def run_audio(rid: str, files: list[UploadFile] = File(...), song: str | None = Form(None)) -> dict:
     """Audio you add to a run: one file for one song, or many matched to its list by their tags or names."""

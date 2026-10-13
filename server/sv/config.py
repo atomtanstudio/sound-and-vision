@@ -53,6 +53,7 @@ class Config:
     mitte: bool  # the owner's own picture service through their Claude account (SV_MITTE=1); off for everyone else
     music: str  # a folder of your music (Artist/…/Song.flac), or smb://host/share/path; empty: you add songs by hand
     addons: str  # a folder of your own add-ons (see sv/addons.py); empty: none
+    lrclib: str  # LRCLIB, the open lyrics database, for a training song's published words; empty: not asked
     # VRGameDevGirl's Video Builder (her ComfyUI pack and its H3 film skill) in its own ComfyUI container, for music
     # videos with people singing: the films folder as the host sees it and as the container does
     vrgdg_box: str
@@ -141,6 +142,7 @@ def load() -> Config:
         mitte=os.environ.get("SV_MITTE") == "1",
         music=os.environ.get("SV_MUSIC", ""),
         addons=os.environ.get("SV_ADDONS", ""),
+        lrclib=os.environ.get("SV_LRCLIB", "https://lrclib.net").rstrip("/"),
         vrgdg_box=os.environ.get("SV_VRGDG_BOX", "ai-comfy-vrgdg"),
         vrgdg_python=os.environ.get("SV_VRGDG_PYTHON", "/opt/venv/bin/python"),
         vrgdg_skill=os.environ.get("SV_VRGDG_SKILL", "/vrgdg/profile/claude/vrgdg-h3-film"),

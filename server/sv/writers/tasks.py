@@ -53,7 +53,8 @@ LIVING_SYSTEM = (
     "that take turns. It must never pull attention from the music. You make every decision yourself, with taste, and "
     "explain it in plain words to the artist. Answer only with the JSON asked for."
 )
-SYSTEMS = {"research": RESEARCH_SYSTEM, "cover": COVER_SYSTEM, "motion": MOTION_SYSTEM, "living": LIVING_SYSTEM}
+SYSTEMS = {"research": RESEARCH_SYSTEM, "captions": RESEARCH_SYSTEM, "cover": COVER_SYSTEM, "motion": MOTION_SYSTEM,
+           "living": LIVING_SYSTEM}
 
 
 def system(task: str) -> str:
@@ -123,6 +124,10 @@ SCHEMAS["research"] = _strict({
     "artists": {"type": "array", "items": _strict({"name": {"type": "string"}, "why": {"type": "string"}, "songs": LINES})},
     "preview_lyrics": {"type": "array", "items": SECTION},
 })
+
+VOCALS = ["sung", "instrumental", "unsure"]
+SCHEMAS["captions"] = _strict({"songs": {"type": "array", "items": _strict({
+    "id": {"type": "string"}, "caption": {"type": "string"}, "vocals": {"type": "string", "enum": VOCALS}})}})
 
 # Keys the interface offers (and YuE2 reads as a hint): "A minor", "F# major"…
 NOTE = {"c": "C", "c#": "C#", "db": "C#", "d": "D", "d#": "Eb", "eb": "Eb", "e": "E", "f": "F", "f#": "F#", "gb": "F#",
@@ -380,6 +385,28 @@ def prompt(task: str, body: dict) -> tuple[str, dict]:
             'Return JSON: {"name": "...", "kind": "Genre", "trigger": "...", "about": "...", "how_many": "...", '
             '"style": "...", "voice": "female", "artists": [{"name": "...", "why": "...", "songs": ["...", "..."]}], '
             '"preview_lyrics": [{"kind": "verse", "lines": ["..."]}, {"kind": "chorus", "lines": ["..."]}]}']))
+    elif task == "captions":
+        sound = body.get("sound") or {}
+        songs = "\n".join(
+            f'- id {_clean(x.get("id"), 20)}: {_clean(x.get("artist"), 80)} – {_clean(x.get("title"), 120)}'
+            f'{" (its published lyrics were found)" if x.get("words") else ""}\n  heard as: {_clean(x.get("caption"), 900)}'
+            for x in body.get("songs") or [])
+        text = "\n".join([
+            f"Task: these recordings are the training set for an influence that teaches a music model the sound "
+            f"\"{_clean(sound.get('name'), 60)}\" ({_clean(sound.get('style'), 400)}). An audio model listened to each one "
+            "and wrote the caption it will be trained with. Audio models often get the genre wrong and miss or mislabel the "
+            "vocals: harsh, shouted, growled or distorted singing is often called instrumental or not mentioned at all. A "
+            "wrong caption teaches the model the wrong thing.",
+            "For each recording, using what you know of it: rewrite the caption in two or three sentences, as a caption for "
+            "training a music generator: the genre and sub-genre, the era, the main instruments, the production, the lead "
+            "vocal (gender, timbre and delivery, such as harsh shouted, growled, snarled, distorted, deadpan, spoken, "
+            "whispered or clean sung, and its effects) or that it is instrumental, the mood, and the tempo. Keep what the "
+            "audio model heard where it fits the recording (tempo, key, production details) and correct what doesn't. Never "
+            "quote, paraphrase or mention any lyrics, and never name the artist, the song or any other artist.",
+            "Also say whether the recording has a lead vocal: sung (anyone singing, shouting, rapping or speaking words), "
+            "instrumental, or unsure when you don't know the recording well enough to say.",
+            f"The recordings:\n{songs}",
+            'Return JSON: {"songs": [{"id": "...", "caption": "...", "vocals": "sung"}]}, one entry for each recording.'])
     else:
         raise KeyError(task)
     return text, SCHEMAS[task]
@@ -493,6 +520,16 @@ def read(task: str, data: dict) -> dict:
                 "style": _clean(data.get("style"), 400),
                 "voice": data.get("voice") if data.get("voice") in ("female", "male", "duet") else None,
                 "artists": artists[:16], "previewLyrics": [x for x in lyrics if x["lines"]][:4]}
+    if task == "captions":
+        out = []
+        for x in data.get("songs") or []:
+            caption = _clean((x or {}).get("caption"), 700)
+            if x.get("id") and len(caption) >= 40:
+                out.append({"id": _clean(x["id"], 20), "caption": caption,
+                            "vocals": x.get("vocals") if x.get("vocals") in VOCALS else "unsure"})
+        if not out:
+            raise ValueError("no captions")
+        return {"songs": out}
     return data
 
 
