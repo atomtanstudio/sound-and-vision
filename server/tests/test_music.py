@@ -193,3 +193,103 @@ def test_answers_to_the_session_are_never_written_through_a_link(tmp_path):
     (work / "pictures" / "done").symlink_to(outside)  # Claude replaced the folder with a link
     music.reply(work, work / "pictures" / "done", "b.json", {"ok": True})
     assert not (outside / "b.json").exists()
+
+
+def test_every_kind_of_music_video_is_told_about_joins():
+    assert "## Joins" in music.JOINS and "out/joins.json" in music.JOINS and "tools/joins.py smooth" in music.JOINS
+    assert "up to 15 seconds is one clip" in music.JOINS and "tools/joins.py check" in music.JOINS
+    assert "pieces that each start on the last frame" not in music.H3_MOTION  # the recipe that made the seams
+    builder = music.with_joins((Path(music.__file__).parent / "VRGDG.md").read_text())
+    assert builder.index("## Joins") < builder.index("## Hand back") and builder.count("## Joins") == 1
+    assert music.with_joins(music.with_joins(builder)) == builder  # kept up to date in place, never twice
+
+
+def test_a_note_brings_an_earlier_video_s_notes_and_tools_up_to_date(tmp_path):
+    work = tmp_path / "work"; work.mkdir()
+    (work / "CLAUDE.md").write_text("# This folder\n\n## Pictures\n\npics\n\n## Motion: MiniMax H3 (`tools/h3.py`)\n\n"
+                                    "A longer shot can be pieces that each start on the last frame of the one before.\n"
+                                    "\n## Hand back\n\n- out/final.mp4\n")
+    m = music.Music.__new__(music.Music)
+    m.cfg = types.SimpleNamespace(mitte=False)
+    m.writers = types.SimpleNamespace(mcp=types.SimpleNamespace(get=lambda sid: None), catalogs=None)
+    asyncio.run(m.refresh(None, {"id": "p"}, {"kind": "surreal", "motion": "local"}, work))
+    notes = (work / "CLAUDE.md").read_text()
+    assert "## Joins" in notes and "pieces that each start" not in notes
+    assert notes.index("## Pictures") < notes.index("## Motion") < notes.index("## Joins") < notes.index("## Hand back")
+    # notes from before Joins had its own section (the way "Tears" got them): one Joins section after a refresh
+    (work / "CLAUDE.md").write_text(notes.replace("\n## Joins", "\n### Joins").replace("## Hand back", "## Hand back", 1))
+    asyncio.run(m.refresh(None, {"id": "p"}, {"kind": "surreal", "motion": "local"}, work))
+    again = (work / "CLAUDE.md").read_text()
+    assert again.count("## Joins") == 1 and "### Joins" not in again and again.count("## Hand back") == 1
+    assert notes.count("## Hand back") == 1 and "pics" in notes
+    for tool in ("h3.py", "picture.py", "joins.py"):
+        assert (work / "tools" / tool).exists(), tool
+    assert "def smooth" in (work / "tools" / "joins.py").read_text()
+
+
+def test_the_joins_tool_says_how_to_use_it():
+    import ast
+    src = (Path(music.__file__).parent / "jointool.py").read_text()
+    doc = ast.get_docstring(ast.parse(src))
+    for idea in ("tools/joins.py check", "tools/joins.py smooth", "CLIP:FIRST:COUNT", ":rev", "exactly COUNT frames",
+                 "the camera turns"):
+        assert idea in doc, idea
+
+
+def test_a_whole_move_can_be_one_fifteen_second_take(tmp_path):
+    answer, comfy, _ = _helper_round(tmp_path, {"image": "shots/a.png", "prompt": "one long move", "out": "clips/a.mp4",
+                                                "seconds": 15, "width": 1344, "height": 768})
+    assert answer["ok"] and answer["frames"] == 362
+    answer, _, _ = _helper_round(tmp_path / "b", {"image": "shots/a.png", "prompt": "x", "out": "clips/a.mp4", "seconds": 16})
+    assert not answer["ok"] and "1 to 15" in answer["error"]
+
+
+
+def _checker(tmp_path, report, listed=True):
+    work = tmp_path / "work"; (work / "out").mkdir(parents=True)
+    video = work / "out" / "final.mp4"; video.write_bytes(b"x")
+    if listed:
+        (work / "out" / "joins.json").write_text(json.dumps({"joins": [12.5, 36.9]}))
+    m = music.Music.__new__(music.Music)
+    m.cfg = types.SimpleNamespace()
+    said = {}
+    m.film_changed = lambda pid, **kw: said.update(kw)
+    async def studio(cfg, *args, timeout=0):
+        assert args[0] == "exec" and "tools/joins.py check out/final.mp4 --joins out/joins.json --json" in args[-1]
+        (work / "out" / "tmp" / "joins-check.json").write_text(json.dumps(report))
+    music.folder.studio, old = studio, music.folder.studio
+    try:
+        note = asyncio.run(m.verify(types.SimpleNamespace(update=lambda **kw: None), {"id": "p"}, {}, work, video))
+    finally:
+        music.folder.studio = old
+    return note, said
+
+
+def test_the_app_checks_the_joins_handed_back_and_says_what_to_fix(tmp_path):
+    ok = {"joins": [{"at": 12.5, "ok": True}, {"at": 36.9, "ok": True}], "failed": 0}
+    note, said = _checker(tmp_path, ok)
+    assert note is None and said["joinsCheck"]["checked"] == 2 and said["joinsCheck"]["failed"] == []
+    bad = {"joins": [{"at": 12.5, "ok": True}, {"at": 36.9, "ok": False, "why": "frames are skipped: the picture jumps"}]}
+    note, said = _checker(tmp_path / "b", bad)
+    assert "1 of the 2 listed don't pass" in note and "0:36.9" in note and "frames are skipped" in note
+    assert said["joinsCheck"]["failed"] == [{"at": 36.9, "why": "frames are skipped: the picture jumps"}]
+    note, _ = _checker(tmp_path / "c", ok, listed=False)
+    assert note == music.NO_JOINS_LIST and "out/joins.json" in note
+
+
+def test_the_director_is_sent_back_at_most_twice(tmp_path):
+    from sv.video.kinetic import Kinetic
+    film = {"id": "f1", "fixRounds": 0}
+    sent = []
+    k = Kinetic.__new__(Kinetic)
+    k.JOB = "music.film"
+    k.app = types.SimpleNamespace(store=types.SimpleNamespace(project=lambda pid: {"id": pid}),
+                                  sched=types.SimpleNamespace(submit=lambda kind, job, pid: sent.append(job) or {"id": f"j{len(sent)}"}))
+    k.get = lambda p: {"film": film}
+    k.film_changed = lambda pid, **kw: film.update(kw)
+    async def verify(ctx, p, f, work, video):
+        return "fix the join at 0:36.9"
+    k.verify = verify
+    results = [asyncio.run(k._send_back(None, {"id": "p"}, film, tmp_path, tmp_path / "v.mp4")) for _ in range(3)]
+    assert results == [True, True, False] and len(sent) == 2 and film["fixRounds"] == 2
+    assert sent[0]["stage"] == "note" and sent[0]["app"] and sent[0]["text"] == "fix the join at 0:36.9"

@@ -135,7 +135,7 @@ class Kinetic:
             raise JobError("Write the note first.")
         job = self.app.sched.submit(self.JOB, {"filmId": film["id"], "stage": "note", "text": text, "go": go,
                                                      "message": "Waiting its turn"}, pid)
-        self.film_changed(pid, status="queued", jobId=job["id"], error=None, message="Waiting its turn",
+        self.film_changed(pid, status="queued", jobId=job["id"], error=None, message="Waiting its turn", fixRounds=0,
                           notes=[*(film.get("notes") or []), {"text": text, "go": go, "at": time.time()}])
         return job
 
@@ -160,6 +160,32 @@ class Kinetic:
         return [{"file": str(f.relative_to(root)), "at": f.stat().st_mtime} for f in pics]
 
     # ---- the job (studio lane) ---------------------------------------------------------------------------------
+    async def refresh(self, ctx: Context, p: dict, film: dict, work: Path) -> None:
+        """Before a note continues the film: bring what the app owns in the folder up to date (nothing, here)."""
+
+    async def verify(self, ctx: Context, p: dict, film: dict, work: Path, video: Path) -> str | None:
+        """After a video is handed back: what the app's own check found that must be fixed, as a note for the director,
+        or None (nothing is checked, here)."""
+        return None
+
+    FIX_ROUNDS = 2  # times the app sends the director back on its own before the person sees what's left
+
+    async def _send_back(self, ctx: Context, p: dict, film: dict, work: Path, video: Path) -> bool:
+        """The app's check, and when it fails and rounds are left, the director sent back to fix it (a note of the
+        app's own, queued after this job). True when it was sent back."""
+        fix = await self.verify(ctx, p, film, work, video)
+        if not fix:
+            return False
+        now = self.get(self.app.store.project(p["id"]) or {})["film"] or film
+        rounds = int(now.get("fixRounds") or 0)
+        if rounds >= self.FIX_ROUNDS:
+            return False
+        job = self.app.sched.submit(self.JOB, {"filmId": film["id"], "stage": "note", "text": fix, "go": False, "app": True,
+                                               "message": "Waiting its turn"}, p["id"])
+        self.film_changed(p["id"], status="queued", jobId=job["id"], fixRounds=rounds + 1, error=None,
+                          message="The app's check found joins to fix: sending it back to fix them")
+        return True
+
     async def job(self, ctx: Context) -> dict:
         pid, fid = ctx.job["projectId"], ctx.job["filmId"]
         p, take = self._ready(pid)
@@ -178,6 +204,7 @@ class Kinetic:
             parts.append(HARD)
             prompt, resume = "\n\n".join(parts), None
         else:
+            await self.refresh(ctx, p, film, work)
             prompt = "\n\n".join(x for x in (self.GO if ctx.job.get("go") else "", ctx.job.get("text") or "") if x)
             resume = film.get("session")
 
@@ -223,7 +250,10 @@ class Kinetic:
         concept = work / "plan" / "CONCEPT.md"
         if final.exists() and final.stat().st_mtime >= started:
             rec = await self._keep(ctx, p, take, film, work, final, runs)
-            self.film_changed(pid, status="done", message="Done", reply=reply, video=rec["id"], error=None)
+            self.film_changed(pid, reply=reply, video=rec["id"], error=None)
+            if await self._send_back(ctx, p, film, work, final):
+                return {"video": rec["id"], "seconds": r["seconds"], "sentBack": True}
+            self.film_changed(pid, status="done", message=self.done_message(pid))
             return {"video": rec["id"], "seconds": r["seconds"]}
         handed = await self.handback(ctx, p, take, film, work, started, runs, reply)
         if handed:
@@ -237,9 +267,24 @@ class Kinetic:
         if r["state"] != "done":
             why = next((x["text"] for x in reversed(r["lines"]) if x["kind"] == "error"), "")
             raise JobError("The director stopped before the film was done" + (f": {why[:240]}" if why else ".") + " Send a note to carry on.")
+        if ctx.job.get("app") and film.get("video"):
+            # the app sent it back after its check and it left the video as it was (a choice the person made): the
+            # video stands, so it's done, with what the check still finds
+            self.film_changed(pid, status="done", message=self.done_message(pid), reply=reply)
+            return {"reply": True, "seconds": r["seconds"]}
         # it answered without a new video (a question, or a reply to a note): the person reads it and answers
         self.film_changed(pid, status="waiting", message="Replied", reply=reply)
         return {"reply": True, "seconds": r["seconds"]}
+
+    def done_message(self, pid: str) -> str:
+        """What the person reads when the video is done: what's left that the app's check found, if anything."""
+        film = self.get(self.app.store.project(pid) or {})["film"] or {}
+        check = film.get("joinsCheck") or {}
+        failed = check.get("failed") or []
+        if failed and check.get("at", 0) >= (film.get("runAt") or 0):
+            when = ", ".join(f"{int(x['at'] // 60)}:{x['at'] % 60:04.1f}" for x in failed[:6])
+            return f"Done, but {len(failed)} join{'s' if len(failed) != 1 else ''} still didn't pass the app's check: {when}"
+        return "Done"
 
     async def _keep(self, ctx: Context, p: dict, take: dict, film: dict, work: Path, final: Path, runs: int,
                     opening: bool = False) -> dict:

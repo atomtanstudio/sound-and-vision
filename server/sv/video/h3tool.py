@@ -83,7 +83,7 @@ def main() -> int:
     ap.add_argument("prompt", nargs="?")
     ap.add_argument("--prompt-file")
     ap.add_argument("--out")
-    ap.add_argument("--seconds", type=float, default=6.0)
+    ap.add_argument("--seconds", type=float, default=6.0, help="1 to 15 (a whole move can be one take)")
     ap.add_argument("--size", default="1344x768")
     ap.add_argument("--end")
     ap.add_argument("--seed", type=int)

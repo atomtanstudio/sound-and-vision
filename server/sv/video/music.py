@@ -23,6 +23,7 @@ import os
 import random
 import re
 import shutil
+import time
 from pathlib import Path
 
 import numpy as np
@@ -33,7 +34,7 @@ from ..comfy.client import ComfyError
 from .. import localpics
 from ..jobs import Context, JobError
 from ..writers import WriterError, grok_media
-from . import h3
+from . import folder, h3
 from .kinetic import Kinetic
 
 HERE = Path(__file__).resolve().parent
@@ -157,12 +158,14 @@ H3_MOTION = """H3 runs on the machine's GPU through the app. A still is the clip
   them. `--prompt-file` takes the prompt from a file, and `python3 tools/h3.py --help` shows the rest.
 - `--end shots/s02.png` pins the last frame too, so the clip travels from one picture to the other: one thing
   turning into another, or a transition.
-- Clips are 1344 × 768 by default (`--size`; multiples of 32, up to 1536 a side), at 24 fps, with no sound. Stills are
+- 1 to 15 seconds (`--seconds`). Clips are 1344 × 768 by default (`--size`; multiples of 32, up to 1536 a side), at
+  24 fps, with no sound. Stills are
   scaled and centre-cropped to that size. The app renders one clip at a time, in the order sent: about 90 seconds for
   a 6-second clip.
 - What's been seen of H3:
   - Given more than about 8 seconds, it tends to cut to a new shot partway through: 7 of 12 twelve-second clips cut,
-    against 1 of 9 six-second clips. A longer shot can be pieces that each start on the last frame of the one before.
+    against 1 of 9 six-second clips. For a long take, say it's one continuous shot with no cuts, look through it, and
+    render it again with another `--seed` if it cut.
   - It follows plain descriptions of motion and camera moves.
   - It can add things that weren't asked for, such as faces, hands or lettering.
   - Each render is different: the same still and prompt with another `--seed` gives another take."""
@@ -196,6 +199,40 @@ still with `python3 tools/h3.py` on the GPU instead and say so. Follow any job t
 `clips/` with `curl`.{paid}"""
 
 
+# The person's finding on "Tears" (2026-10-13): wherever one clip carried on from another (29 joins), the motion
+# shifted at the join. H3 starts each clip from its still at rest; pinned ends slow to a stop; trims skipped frames or
+# showed the shared picture twice. Smoothing the film's own frames fixed joins where the camera kept going (they
+# approved the window join); where it turned, only one clip for the whole move hides it.
+JOINS = """## Joins
+
+H3 starts every clip from its first picture at rest and sets off its own way. So wherever one clip carries on from
+another, the motion changes at the join: the camera stops and lurches, or turns. The person sees every one of these,
+and they spoil the video. The app checks every join you hand back.
+
+- Keep a continuous camera move in one clip: up to 15 seconds is one clip. A turn, a stop or a change of speed
+  happens inside a clip, never at a join.
+- Where a move has to go on into another clip, the camera must keep going the same way. Start the next clip on the
+  exact last frame the video shows of the one before, and show every frame across the join: don't trim the end of one
+  or the start of the next, don't show the shared picture twice, and don't play a clip backwards there. A clip pinned
+  to end on a picture slows to a stop on it, so a move that goes on past that picture needs its join smoothed.
+- Smooth each chain of clips that continue one another with `python3 tools/joins.py smooth` (`--help` says how). It
+  re-times the frames through each join so the speed flows on, and smooths the camera's path, using the clips' own
+  frames; play the clips it writes in their place. If it says the camera turns at a join, make that move one clip.
+- A cut to a new picture is fine. A join that looks continuous and isn't is never fine.
+- With every video you hand back, write `out/joins.json`: `{"joins": [12.5, 36.917]}`, the second in that video of
+  every place where one clip carries on from another (the first frame of the one that carries on), and nothing for
+  cuts. Check them with `python3 tools/joins.py check out/final.mp4 --joins out/joins.json` (or `out/opening.mp4`)
+  before you hand back: the app runs the same check and sends you back to fix any that fail."""
+
+
+NO_JOINS_LIST = ("There's no out/joins.json for the video you handed back (or it can't be read), so the app couldn't check "
+                 "its joins. Write it as the Joins notes say (the second of every place one clip carries on from another; "
+                 "an empty list if there are none), check them with tools/joins.py, and hand the video back again.")
+FIX_JOINS = ("The app checked the joins in {video}: {failed} of the {checked} listed don't pass.\n{lines}\n"
+             "Fix each as the Joins notes say (smooth it, or make that move one clip), keep everything else as it is, "
+             "and hand the video back again with out/joins.json up to date.")
+
+
 USE = """
 
 Make every {what} with {choice}. The person chose these in Settings to control what the video costs: use no other model
@@ -206,6 +243,10 @@ don't allow, say so in your notes rather than changing them."""
 def motion_section(by: str, server: dict | None = None, use: str = "") -> str:
     """The Surreal notes' Motion section for this video. `use`: the model and settings the person chose on their MCP
     server (sv/catalog.py's choice_words)."""
+    return _motion_section(by, server, use)
+
+
+def _motion_section(by: str, server: dict | None = None, use: str = "") -> str:
     if by == "mitte":
         return f"## Motion: hosted H3 (Mitte)\n\n{MITTE_MOTION}\n"
     if by == "grok":
@@ -217,6 +258,18 @@ def motion_section(by: str, server: dict | None = None, use: str = "") -> str:
             paid=" Every clip may cost the person money, so make the ones you need." if server.get("paid") else "") + \
             (USE.format(what="clip", choice=use) if use else "") + "\n"
     return f"## Motion: MiniMax H3 (`tools/h3.py`)\n\n{H3_MOTION}\n"
+
+
+def with_joins(notes: str) -> str:
+    """The notes with the Joins section as it is now: in place of the old one, or before Hand back."""
+    head, sep, rest = notes.partition("\n## Joins")
+    if sep:
+        tail = rest[rest.find("\n## "):] if "\n## " in rest else ""
+        return head + "\n" + JOINS + "\n" + tail
+    head, sep, rest = notes.partition("\n## Hand back")
+    if sep:
+        return head.rstrip("\n") + "\n\n" + JOINS + "\n" + sep + rest
+    return notes.rstrip("\n") + "\n\n" + JOINS + "\n"
 
 
 def pictures_section(by: str, singing: bool, server: dict | None = None, use: str = "") -> str:
@@ -341,6 +394,55 @@ class Music(Kinetic):
             server = self.writers.mcp.get(by.removeprefix("mcp:")) if by.startswith("mcp:") else None
             use = choice_words(self.writers.catalogs, server["id"], "image", film.get("picturesWith")) if server else ""
             (work / "CLAUDE.md").write_text(head + "\n" + pictures_section(by, singing, server, use) + tail)
+        self._app_parts(film, work)
+        for d in ("shots", "clips", "h3/queue", "h3/done", "pictures/queue", "pictures/done"):
+            (work / d).mkdir(parents=True, exist_ok=True)
+        if singing:
+            for d in ("vrgdg/queue", "vrgdg/done", "vrgdg/logs"):
+                (work / d).mkdir(parents=True, exist_ok=True)
+
+    async def verify(self, ctx: Context, p: dict, film: dict, work: Path, video: Path) -> str | None:
+        """The app's own check of a video handed back: every join listed in out/joins.json, measured by
+        tools/joins.py. A note for the director when something must be fixed, or None."""
+        listed = work / "out" / "joins.json"
+        if not listed.exists() or listed.stat().st_mtime < video.stat().st_mtime - 3600:
+            return NO_JOINS_LIST
+        ctx.update(stage="check", message="Checking the joins", progress=None)
+        self.film_changed(p["id"], message="Checking the joins")
+        report = work / "out" / "tmp" / "joins-check.json"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.unlink(missing_ok=True)
+        try:
+            await folder.studio(self.cfg, "exec", str(work), "sh", "-c",
+                                f"cd /work && PYTHONUSERBASE=/work/.local python3 tools/joins.py check "
+                                f"{video.relative_to(work)} --joins out/joins.json --json > out/tmp/joins-check.json || true",
+                                timeout=1800)
+            data = json.loads(report.read_text())
+            joins = data["joins"]
+        except (JobError, OSError, ValueError, KeyError, TypeError):
+            if listed.exists():
+                try:
+                    json.loads(listed.read_text())
+                except ValueError:
+                    return NO_JOINS_LIST
+            self.film_changed(p["id"], joinsCheck={"error": "The joins couldn't be checked.", "at": time.time()})
+            return None  # the check itself didn't work: the video isn't held back for that
+        bad = [j for j in joins if not j.get("ok")]
+        self.film_changed(p["id"], joinsCheck={"checked": len(joins), "failed": [{"at": j["at"], "why": j.get("why")} for j in bad],
+                                               "at": time.time()})
+        if not bad:
+            return None
+        return FIX_JOINS.format(failed=len(bad), checked=len(joins), video=video.relative_to(work),
+                                lines="\n".join(f"- {_clock(j['at'])} ({j['at']} s): {j.get('why')}" for j in bad))
+
+    async def refresh(self, ctx: Context, p: dict, film: dict, work: Path) -> None:
+        """Before a note: the app's own tools and Motion notes as they are now, so a video made earlier gets what has
+        been learned since (the Joins notes and tools/joins.py came after "Tears" was made)."""
+        if (work / "CLAUDE.md").exists():
+            self._app_parts(film, work)
+
+    def _app_parts(self, film: dict, work: Path) -> None:
+        """What the app owns in the folder: the Motion and Joins notes and the tools it answers or ships."""
         clips = self.motion(film)
         notes = (work / "CLAUDE.md").read_text()
         head, sep, rest = notes.partition("\n## Motion")
@@ -348,16 +450,14 @@ class Music(Kinetic):
             tail = rest[rest.find("\n## "):] if "\n## " in rest else ""
             server = self.writers.mcp.get(clips.removeprefix("mcp:")) if clips.startswith("mcp:") else None
             use = choice_words(self.writers.catalogs, server["id"], "video", film.get("motionWith")) if server else ""
-            (work / "CLAUDE.md").write_text(head + "\n" + motion_section(clips, server, use) + tail)
+            notes = head + "\n" + motion_section(clips, server, use) + tail
+        (work / "CLAUDE.md").write_text(with_joins(notes))
         (work / "tools").mkdir(exist_ok=True)
         shutil.copyfile(HERE / "h3tool.py", work / "tools" / "h3.py")
         shutil.copyfile(HERE / "picturetool.py", work / "tools" / "picture.py")
-        for d in ("shots", "clips", "h3/queue", "h3/done", "pictures/queue", "pictures/done"):
-            (work / d).mkdir(parents=True, exist_ok=True)
-        if singing:
+        shutil.copyfile(HERE / "jointool.py", work / "tools" / "joins.py")
+        if film.get("kind") in SINGING:
             shutil.copyfile(HERE / "vrgdgtool.py", work / "tools" / "vrgdg.py")
-            for d in ("vrgdg/queue", "vrgdg/done", "vrgdg/logs"):
-                (work / d).mkdir(parents=True, exist_ok=True)
 
     async def handback(self, ctx: Context, p: dict, take: dict, film: dict, work: Path, started: float, runs: int,
                        reply: str) -> dict | None:
@@ -365,8 +465,11 @@ class Music(Kinetic):
         if not (first.exists() and first.stat().st_mtime >= started):
             return None
         rec = await self._keep(ctx, p, take, film, work, first, runs, opening=True)
-        self.film_changed(p["id"], status="waiting", message="The part is ready" if film.get("part") else "The opening is ready",
-                          reply=reply, video=rec["id"], error=None)
+        self.film_changed(p["id"], reply=reply, video=rec["id"], error=None)
+        if await self._send_back(ctx, p, film, work, first):
+            return {"video": rec["id"], "opening": True, "sentBack": True}
+        ready = "The part is ready" if film.get("part") else "The opening is ready"
+        self.film_changed(p["id"], status="waiting", message=ready + self.done_message(p["id"]).removeprefix("Done"))
         return {"video": rec["id"], "opening": True}
 
     # ---- H3 and the Video Builder, beside the session --------------------------------------------------------
@@ -697,8 +800,8 @@ class Music(Kinetic):
         if width % 32 or height % 32 or not (256 <= width <= 1536 and 256 <= height <= 1536):
             raise JobError("The size must be multiples of 32, from 256 to 1536 a side (1344x768 is 16:9).")
         seconds = float(req.get("seconds") or 6)
-        if not 1 <= seconds <= 12:
-            raise JobError("A clip can be 1 to 12 seconds.")
+        if not 1 <= seconds <= 15:  # H3's trained range reaches 362 frames: a whole move can be one take
+            raise JobError("A clip can be 1 to 15 seconds.")
         text = " ".join(str(req.get("prompt") or "").split())
         if not text or len(text) > 6000:
             raise JobError("The prompt must be some words (at most 6000 characters).")
