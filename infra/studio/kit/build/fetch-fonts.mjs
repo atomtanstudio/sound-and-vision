@@ -66,7 +66,7 @@ export const FONTS = {
   'VT323.ttf': 'ofl/vt323/VT323-Regular.ttf',
   'PressStart2P.ttf': 'ofl/pressstart2p/PressStart2P-Regular.ttf',
   'PixelifySans.ttf': 'ofl/pixelifysans/PixelifySans[wght].ttf',
-  'Tiny5.ttf': 'ofl/tiny5/Tiny5-Regular.ttf',
+  'Tiny5.ttf': 'ofl/tiny5/Tiny5[BLED,JITT,ROND,wdth,wght].ttf',
   'Jersey10.ttf': 'ofl/jersey10/Jersey10-Regular.ttf',
   'Jersey15.ttf': 'ofl/jersey15/Jersey15-Regular.ttf',
   'DotGothic16.ttf': 'ofl/dotgothic16/DotGothic16-Regular.ttf',
