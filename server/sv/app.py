@@ -33,6 +33,7 @@ from .comfy.client import Comfy
 from .comfy.registry import Registry
 from .config import load
 from .events import Hub
+from .modelfiles import ModelFiles
 from .jobs import JobError, Scheduler
 from .music import eleven, yue2
 from .music.takes import run_other_take, run_yue2_take
@@ -55,7 +56,8 @@ log = logging.getLogger("sv.app")
 cfg = load()
 store = Store(cfg.db)
 hub = Hub()
-comfy = Comfy(cfg.comfy)
+model_files = ModelFiles(cfg.models, cfg.loras)
+comfy = Comfy(cfg.comfy, check_graph=model_files.problems)
 registry = Registry()
 sched = Scheduler(cfg, store, hub, comfy, registry)
 sched.register("song.yue2", "gpu", run_yue2_take)
@@ -197,7 +199,10 @@ async def health() -> dict:
 
 @app.get("/api/models/check")
 async def models_check() -> dict:
-    return registry.check(await comfy.object_info(refresh=True))
+    report = registry.check(await comfy.object_info(refresh=True))
+    for wid, w in registry.workflows.items():
+        report[wid] = report.get(wid, []) + model_files.problems(w.graph)
+    return report
 
 
 # ---- live events -------------------------------------------------------------------------------

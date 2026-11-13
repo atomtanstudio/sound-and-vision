@@ -374,24 +374,13 @@ make_folders() {
 # ---- the instrumental influence -----------------------------------------------------------------------------------
 # "YuE2-instrumental-cot-full-loras" by Mothersuperior, CC BY-NC 4.0 (non-commercial use only): YuE2 uses it for every
 # instrumental. Downloaded unmodified from the author's own page and checked; it isn't in this repo (CREDITS.md).
-INST_FILE="ar_lora_inst_v3abc_comfyui.safetensors"
-INST_URL="https://huggingface.co/Mothersuperior/YuE2-instrumental-cot-full-loras/resolve/main/$INST_FILE"
-INST_SHA="de6a11d5701df103a191c87dc73115266e2420f3834739319dec5c24d2119f31"
+INST_FILE="loras/soundandvision/yue2/ar_lora_inst_v3abc_comfyui.safetensors"   # its line in scripts/models.txt
 
-fetch_instrumental() {
+fetch_instrumental() {  # models.sh fetches it: resumed after a drop, checked against its SHA-256, kept only when whole
   step "The instrumental influence"
-  local dest="$LORAS/soundandvision/yue2/$INST_FILE"
-  if [ -f "$dest" ]; then
-    ok "$INST_FILE is here"
-    return
-  fi
   note "\"YuE2-instrumental-cot-full-loras\" by Mothersuperior, CC BY-NC 4.0 (non-commercial use only; see CREDITS.md)"
-  if curl -fL --retry 3 -o "$dest.part" "$INST_URL" && printf '%s  %s\n' "$INST_SHA" "$dest.part" | sha256sum -c --status; then
-    mv "$dest.part" "$dest"
-    ok "downloaded $INST_FILE (213 MB) from huggingface.co/Mothersuperior"
-  else
-    rm -f "$dest.part"
-    warn "couldn't download $INST_FILE; YuE2 instrumentals need it: $INST_URL"
+  if ! SV_MODELS="$MODELS" SV_LORAS="$LORAS" "$REPO/scripts/models.sh" --file "$INST_FILE"; then
+    warn "couldn't download ${INST_FILE##*/}; YuE2 instrumentals need it (scripts/models.sh songs fetches it too)"
   fi
 }
 
@@ -520,27 +509,47 @@ MODEL_FILES=(
   "Living Album Cover: keeping people still (SAM 3.1)|checkpoints/sam3.1_multiplex_fp16.safetensors"
 )
 
-have_model() {  # ComfyUI reads clip/ as text_encoders/ and unet/ as diffusion_models/
+# each file's size, from scripts/models.txt: a file counts as here only at its full size (a stopped download leaves
+# one cut short, and ComfyUI loading it can fail or hang)
+declare -A MODEL_BYTES=()
+while IFS='|' read -r _ rel _ _ bytes; do MODEL_BYTES[$rel]=$bytes; done \
+  < <(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$REPO/scripts/models.txt")
+
+model_path() {  # where a file is (ComfyUI reads clip/ as text_encoders/ and unet/ as diffusion_models/); "" if not
   local f="$1" base="$MODELS/comfyui" alt=""
   case "$f" in
-    loras/*) [ -f "$LORAS/${f#loras/}" ]; return ;;
+    loras/*) [ -f "$LORAS/${f#loras/}" ] && printf '%s' "$LORAS/${f#loras/}"; return 0 ;;
     text_encoders/*) alt="clip/${f#text_encoders/}" ;;
     diffusion_models/*) alt="unet/${f#diffusion_models/}" ;;
   esac
-  [ -f "$base/$f" ] || { [ -n "$alt" ] && [ -f "$base/$alt" ]; }
+  if [ -f "$base/$f" ]; then printf '%s' "$base/$f"
+  elif [ -n "$alt" ] && [ -f "$base/$alt" ]; then printf '%s' "$base/$alt"; fi
+}
+have_model() {  # 0: here at its full size; 1: missing; 2: there but cut short
+  local p
+  p="$(model_path "$1")"
+  [ -n "$p" ] || return 1
+  [ -z "${MODEL_BYTES[$1]:-}" ] || [ "$(wc -c <"$p" | tr -d ' ')" = "${MODEL_BYTES[$1]}" ] || return 2
 }
 
 models_report() {
   step "Models ($MODELS)"
   local entry what f
-  local -a files missing
+  local -a files missing short
   for entry in "${MODEL_FILES[@]}"; do
     what="${entry%%|*}"
     read -r -a files <<<"${entry#*|}"
-    missing=()
-    for f in "${files[@]}"; do have_model "$f" || missing+=("$f"); done
-    if [ ${#missing[@]} -eq 0 ]; then ok "$what"
-    else
+    missing=() short=()
+    for f in "${files[@]}"; do
+      have_model "$f" && continue
+      if [ $? = 2 ]; then short+=("$f"); else missing+=("$f"); fi
+    done
+    if [ ${#missing[@]} -eq 0 ] && [ ${#short[@]} -eq 0 ]; then ok "$what"; continue; fi
+    if [ ${#short[@]} -gt 0 ]; then
+      warn "$what: cut short (a download that stopped), so it can't be used; scripts/models.sh fetches the rest"
+      for f in "${short[@]}"; do note "$f"; done
+    fi
+    if [ ${#missing[@]} -gt 0 ]; then
       info "$what: missing"
       for f in "${missing[@]}"; do note "$f"; done
     fi

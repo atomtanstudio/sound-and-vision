@@ -47,8 +47,10 @@ class Result:
 
 
 class Comfy:
-    def __init__(self, base: str, *, timeout: float = 30.0):
+    def __init__(self, base: str, *, timeout: float = 30.0,
+                 check_graph: Callable[[dict], list[str]] | None = None):
         self.base = base.rstrip("/")
+        self.check_graph = check_graph   # problems with a graph's model files, found before ComfyUI loads them
         self.ws_base = "ws" + self.base[4:] if self.base.startswith("http") else self.base
         self.http = httpx.AsyncClient(base_url=self.base, timeout=timeout)
         self._object_info: dict | None = None
@@ -122,6 +124,8 @@ class Comfy:
     # ---- running a prompt --------------------------------------------------------
 
     async def submit(self, graph: dict, client_id: str) -> str:
+        if self.check_graph and (problems := self.check_graph(graph)):
+            raise ComfyError(" ".join(problems), detail={"model_files": problems})
         r = await self.http.post("/prompt", json={"prompt": graph, "client_id": client_id})
         if r.status_code == 400:
             body = r.json()

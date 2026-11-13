@@ -45,6 +45,7 @@ fi
 there "mkdir -p $ROOT/app $ROOT/web/dist $ROOT/analysis/worker $ROOT/influence ~/.config/systemd/user && [ -f $ROOT/sv.env ] || cp /dev/null $ROOT/sv.env"
 rsync -a --delete --exclude .venv --exclude __pycache__ --exclude .pytest_cache --exclude tests server/ "$HOST:$ROOT/app/"
 rsync -a --delete --exclude __pycache__ infra/legion/analysis/worker/ "$HOST:$ROOT/analysis/worker/"
+rsync -a scripts/models.txt "$HOST:$ROOT/scripts/"   # the model sizes the app checks before a job
 rsync -a --delete --exclude __pycache__ infra/legion/influence/ "$HOST:$ROOT/influence/"
 there "mkdir -p \${SV_LORAS:-\${SV_MODELS:-$ROOT/models}/comfyui/loras}/soundandvision/yue2"
 rsync -a infra/legion/influences/yue2/ "$HOST:$(there 'echo ${SV_LORAS:-${SV_MODELS:-'"$ROOT"'/models}/comfyui/loras}')/soundandvision/yue2/"
