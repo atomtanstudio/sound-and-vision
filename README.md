@@ -39,8 +39,11 @@ run, just before they were built into the app.
     rendered in a headless browser on your GPU.
   - *Music Video*: Performance, Hybrid or Surreal, directed by your director model, with every scene filmed by MiniMax H3 on
     your GPU. Performance and Hybrid lip-sync the real vocal with VRGameDevGirl's Video Builder (optional, see below).
-- **Library, Brand and Share.** Your songs and videos in folders. Your logos and house look. Clips cut for TikTok,
-  Reels, Shorts and posts.
+    Their performers can be new characters, your own (from your Cast), or the same as an earlier video's.
+- **Library, Brand and Share.** Your songs and videos in folders. Your Cast: characters you save once, with up to four
+  pictures each, so the same faces carry through a video and a whole series (a character saved from an earlier video,
+  or your own pictures, confirming each time that they show an invented character, you, or someone who agreed to it).
+  Your logos and house look. Clips cut for TikTok, Reels, Shorts and posts.
 - **Influence Engine.** Trains a style LoRA (an "influence") for YuE2. Your chosen model picks the artists and songs that define
   the sound, you supply the audio from your own music folder or by upload, MOSS-Music captions it, FL YuE2 trains,
   and you pick a checkpoint by ear. Nothing is downloaded from any music service.

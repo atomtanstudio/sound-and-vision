@@ -31,7 +31,7 @@ from PIL import Image
 
 from ..catalog import choice_words
 from ..comfy.client import ComfyError
-from .. import localpics
+from .. import cast as cast_mod, localpics
 from ..jobs import Context, JobError
 from ..writers import WriterError, grok_media
 from . import folder, h3
@@ -145,7 +145,15 @@ GPT Image 2.5 (slug `gpt-image-25`). The guide notes that Nano Banana 2.1 holds 
 costs the person money (GPT Image 2.5 at 2K: about $0.07 at high quality, about $0.28 at max), so make the ones you
 need."""}
 PICTURE_WHERE = {"surreal": "Keep your pictures in `shots/`: the person sees the newest ones there while you work.",
-                 "singing": "The performers are original characters you invent: never the real artist, never a real person."}
+                 "singing": "The performers are original characters you invent: never the real artist, never a real person.",
+                 # the person chose the cast (Your cast): the rule is for everyone else
+                 "cast": "The leads are the person's own cast (see Your cast). Anyone else you add is an original character "
+                         "you invent: never the real artist, never a real person."}
+# After the request, when the person chose the cast (Library → Cast, or an earlier video's)
+CAST = ("The person chose this video's cast: they are the performers (Your cast, in your notes), exactly as their pictures "
+        "show them, in place of performers you invent.")
+CAST_REAL = (" Some of them are real people, with their say-so, and one may be the song's own artist: that's the person's "
+             "choice, so use them.")
 
 
 # How the clips are made (Surreal), as the person chose (Settings → Animating scenes): MiniMax H3 on the GPU through
@@ -272,8 +280,8 @@ def with_joins(notes: str) -> str:
     return notes.rstrip("\n") + "\n\n" + JOINS + "\n"
 
 
-def pictures_section(by: str, singing: bool, server: dict | None = None, use: str = "") -> str:
-    """The notes' Pictures section for this video. `use`: as motion_section's."""
+def pictures_section(by: str, singing: bool, server: dict | None = None, use: str = "", cast: bool = False) -> str:
+    """The notes' Pictures section for this video. `use`: as motion_section's. `cast`: the person chose the cast."""
     kind = "singing" if singing else "surreal"
     if (maker := picture_maker(by)):
         body = PICTURE_TOOL.format(name=maker[0], refs=maker[1], cost=maker[2])
@@ -291,7 +299,7 @@ def pictures_section(by: str, singing: bool, server: dict | None = None, use: st
         maker = picture_maker("local")
         assert maker
         body = PICTURE_TOOL.format(name=maker[0], refs=maker[1], cost=maker[2])
-    return f"## Pictures\n\n{body}\n\n{PICTURE_WHERE[kind]}\n"
+    return f"## Pictures\n\n{body}\n\n{PICTURE_WHERE['cast' if cast and singing else kind]}\n"
 
 
 class Music(Kinetic):
@@ -304,10 +312,17 @@ class Music(Kinetic):
           "(out/final.mp4). Go all out.")
 
     def start(self, pid: str, request: str = "", feel: str = "", kind: str = "surreal", opening: bool = True,
-              model: str | None = None, effort: str | None = None, part: dict | None = None) -> dict:  # type: ignore[override]
+              model: str | None = None, effort: str | None = None, part: dict | None = None,
+              cast: list[str] | None = None, cast_from: dict | None = None) -> dict:  # type: ignore[override]
         if kind not in KINDS:
             raise JobError("Choose a kind of music video: performance, hybrid or surreal.")
         extra: dict = {"kind": kind, "opening": bool(opening or part)}
+        if cast or cast_from:  # the person's own characters (Library → Cast), or an earlier video's
+            if kind not in SINGING:
+                raise JobError("A cast is for the lip-synced kinds, Performance and Hybrid: a Surreal video has no performers.")
+            members = self.app.cast.resolve(cast, cast_from)
+            extra.update(cast=list(cast or []), castFrom=dict(cast_from) if cast_from else None,
+                         castNames=[m["name"] for m in members], castReal=any(m["who"] != "invented" for m in members))
         if part:
             _, take = self._ready(pid)
             a, b = float(part.get("start") or 0), float(part.get("end") or 0)
@@ -367,8 +382,14 @@ class Music(Kinetic):
         part = film.get("part")
         if part:
             a, b = part["start"], part["end"]
-            return [PART.format(a=_clock(a), b=_clock(b), seconds=round(b - a, 1), where=part.get("label") or "the part chosen")]
-        return [FIRST.format(seconds=OPENING_SECONDS)] if film.get("opening") else []
+            parts = [PART.format(a=_clock(a), b=_clock(b), seconds=round(b - a, 1), where=part.get("label") or "the part chosen")]
+            if film.get("cast") or film.get("castFrom"):
+                parts.append(CAST + (CAST_REAL if film.get("castReal") else ""))
+            return parts
+        parts = [FIRST.format(seconds=OPENING_SECONDS)] if film.get("opening") else []
+        if film.get("cast") or film.get("castFrom"):
+            parts.append(CAST + (CAST_REAL if film.get("castReal") else ""))
+        return parts
 
     async def setup(self, ctx: Context, p: dict, take: dict, film: dict, work: Path) -> None:
         singing = film.get("kind") in SINGING
@@ -393,13 +414,34 @@ class Music(Kinetic):
             tail = rest[rest.find("\n## "):] if "\n## " in rest else ""
             server = self.writers.mcp.get(by.removeprefix("mcp:")) if by.startswith("mcp:") else None
             use = choice_words(self.writers.catalogs, server["id"], "image", film.get("picturesWith")) if server else ""
-            (work / "CLAUDE.md").write_text(head + "\n" + pictures_section(by, singing, server, use) + tail)
+            cast = bool(singing and (film.get("cast") or film.get("castFrom")))
+            (work / "CLAUDE.md").write_text(head + "\n" + pictures_section(by, singing, server, use, cast) + tail)
+        if singing and (film.get("cast") or film.get("castFrom")):
+            await self._place_cast(ctx, p, film, work)
         self._app_parts(film, work)
         for d in ("shots", "clips", "h3/queue", "h3/done", "pictures/queue", "pictures/done"):
             (work / d).mkdir(parents=True, exist_ok=True)
         if singing:
             for d in ("vrgdg/queue", "vrgdg/done", "vrgdg/logs"):
                 (work / d).mkdir(parents=True, exist_ok=True)
+
+    async def _place_cast(self, ctx: Context, p: dict, film: dict, work: Path) -> None:
+        """The person's chosen cast into the folder: their pictures as the Video Builder's references, "Your cast" in the
+        notes (just before Pictures), and her skill told the references are the person's own."""
+        ctx.update(stage="prepare", message="Bringing in your cast", progress=0.05)
+        self.film_changed(p["id"], message="Bringing in your cast")
+        section = cast_mod.place(self.app.cast.resolve(film.get("cast"), film.get("castFrom")), work / "characters")
+        notes = (work / "CLAUDE.md").read_text()
+        head, sep, rest = notes.partition("\n## Pictures")
+        (work / "CLAUDE.md").write_text(head.rstrip("\n") + "\n\n" + section + sep + rest if sep else notes.rstrip("\n") + "\n\n" + section)
+        settings = work / "settings.json"
+        try:
+            data = json.loads(settings.read_text())
+        except (OSError, ValueError):
+            data = None
+        if isinstance(data, dict):
+            data["refs_source"] = "own"
+            settings.write_text(json.dumps(data, indent=2))
 
     async def verify(self, ctx: Context, p: dict, film: dict, work: Path, video: Path) -> str | None:
         """The app's own check of a video handed back: every join listed in out/joins.json, measured by

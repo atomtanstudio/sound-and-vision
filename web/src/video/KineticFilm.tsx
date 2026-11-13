@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Said } from "../ui/Said";
 import { api, ApiError, fileUrl } from "../lib/api";
-import { go as goTo, useQuery } from "../lib/router";
+import { go as goTo, linkTo, useQuery } from "../lib/router";
 import type { KineticVideo, Project } from "../lib/types";
 import { usePlayer } from "../state/player";
 import { useSong } from "../state/song";
 import { EFFORT_NAME } from "../shell/Settings";
 import { Button, Disclosure, Segmented, TextArea } from "../ui/controls";
 import { ThumbMaker } from "../library/ThumbMaker";
+import type { CastMember, VideoCast } from "../library/CastPanel";
+import "../library/cast.css";
 import "../library/library.css";
 import "../shell/bring.css";
 import { machine } from "../lib/machine";
@@ -249,7 +251,8 @@ type MvKind = (typeof MV_KINDS)[number]["id"];
 
 function MusicStartForm({ project, busy, onStart, onCancel }: {
   project: Project; busy: string | null; onCancel?: () => void;
-  onStart: (body: { request: string; feel: string; kind: string; opening: boolean; part: Part | null; model: string; effort: string | null }) => Promise<void>;
+  onStart: (body: { request: string; feel: string; kind: string; opening: boolean; part: Part | null; model: string; effort: string | null;
+                    cast: string[]; castFrom: { projectId: string; filmId: string } | null }) => Promise<void>;
 }) {
   const roles = useWho((w) => w.roles);
   const plan = useWho((w) => w.plan);
@@ -286,6 +289,18 @@ function MusicStartForm({ project, busy, onStart, onCancel }: {
     }).catch(() => undefined);
   }, [project.id, kind]);
   const singing = MV_KINDS.find((k) => k.id === kind)!.singing;
+  // who performs (the lip-synced kinds): invented by the director, from your Cast, or an earlier video's cast as it is
+  const [castMode, setCastMode] = useState<"invent" | "cast" | "video">("invent");
+  const [members, setMembers] = useState<CastMember[]>([]);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [videos, setVideos] = useState<VideoCast[]>([]);
+  const [videoAt, setVideoAt] = useState(0);
+  useEffect(() => {
+    void api.get<{ members: CastMember[] }>("/api/cast").then((c) => setMembers(c.members)).catch(() => undefined);
+    void api.get<VideoCast[]>("/api/cast/videos").then(setVideos).catch(() => undefined);
+  }, []);
+  const castVideo = castMode === "video" ? videos[videoAt] ?? null : null;
+  const castReady = !singing || castMode === "invent" || (castMode === "cast" ? chosen.length > 0 : !!castVideo);
   const [feel, setFeel] = useState("");
   const [model, setModel] = useState("claude-opus-5-5");
   const [effort, setEffort] = useState<string>("xhigh");
@@ -310,6 +325,48 @@ function MusicStartForm({ project, busy, onStart, onCancel }: {
           </button>
         ))}
       </div>
+      {singing && (
+        <div className="mv-cast">
+          <Segmented size="sm" label="Who performs" value={castMode} onChange={setCastMode}
+            options={[{ value: "invent", label: "New characters" }, { value: "cast", label: "From your Cast" }, { value: "video", label: "Same as an earlier video" }]} />
+          {castMode === "invent" && <p className="la-note">The director invents the performers (never the real artist or a real
+            person). To keep the same faces across videos, save them to your Cast afterwards (Library → Cast).</p>}
+          {castMode === "cast" && (members.length ? (
+            <>
+              <div className="mv-cast-pick" role="group" aria-label="Your Cast">
+                {members.map((m) => (
+                  <button key={m.id} type="button" className="mv-cast-member" aria-pressed={chosen.includes(m.id)}
+                    onClick={() => setChosen((c) => (c.includes(m.id) ? c.filter((x) => x !== m.id) : [...c, m.id]))}>
+                    {m.pictures[0] && <img src={m.pictures[0].url} alt="" />}
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+              <p className="la-note">{chosen.length ? "They perform, exactly as their pictures show them; anyone else on screen is invented."
+                : "Choose who performs."} <a {...linkTo("/library/cast")}>Your Cast</a></p>
+            </>
+          ) : <p className="la-note">Your Cast is empty. <a {...linkTo("/library/cast")}>Add characters in Library → Cast</a>, with
+            their pictures, then choose them here.</p>)}
+          {castMode === "video" && (videos.length ? (
+            <>
+              <select className="in" value={videoAt} onChange={(e) => setVideoAt(Number(e.target.value))} aria-label="Which video's cast">
+                {videos.map((v, i) => (
+                  <option key={v.filmId} value={i}>{v.title} · {new Date(v.at * 1000).toLocaleDateString()} · {v.cast.map((c) => c.name).join(", ")}</option>
+                ))}
+              </select>
+              {castVideo && (
+                <div className="mv-cast-pick">
+                  {castVideo.cast.map((c) => (
+                    <span key={c.key} className="mv-cast-member" aria-pressed="true">
+                      <img src={fileUrl(castVideo.projectId, c.path)} alt="" />{c.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : <p className="la-note">None of your music videos has characters yet.</p>)}
+        </div>
+      )}
       <label className="br-field"><span>Anything to steer it? (optional)</span>
         <TextArea minRows={2} value={feel} placeholder={`“Cold and minimal”, “like a dream underwater”, “painted, not photographed”… or leave it to ${doer(roles, "film", "the director")}`}
           onChange={(e) => setFeel(e.target.value)} />
@@ -337,8 +394,11 @@ function MusicStartForm({ project, busy, onStart, onCancel }: {
         {request !== base && <Button size="sm" kind="ghost" onClick={() => setRequest(base)}>Back to the default</Button>}
       </Disclosure>
       <div className="la-go">
-        <Button kind="primary" busy={busy === "start"} disabled={!!busy || !project.masterTake || !films.length}
-          onClick={() => okToSpend(pictures, "this video's pictures", using.scenes) && (singing || okToSpend(clips, "this video's clips", using.motion)) && void onStart({ request: request === base ? "" : request, feel, kind, opening: first !== "whole", part, model, effort: effort || null })}>
+        <Button kind="primary" busy={busy === "start"} disabled={!!busy || !project.masterTake || !films.length || !castReady}
+          onClick={() => okToSpend(pictures, "this video's pictures", using.scenes) && (singing || okToSpend(clips, "this video's clips", using.motion)) && void onStart({
+            request: request === base ? "" : request, feel, kind, opening: first !== "whole", part, model, effort: effort || null,
+            cast: singing && castMode === "cast" ? chosen : [],
+            castFrom: singing && castVideo ? { projectId: castVideo.projectId, filmId: castVideo.filmId } : null })}>
           Make the video
         </Button>
         <span>{singing
