@@ -33,6 +33,7 @@ class Config:
     comfy: str
     other_comfys: tuple[str, ...]
     free_others: bool
+    models: Path  # SV_MODELS: ComfyUI's model folders are in its comfyui/ (scripts/models.sh fills them)
     loras: Path
     analysis_image: str
     analysis_worker: Path
@@ -123,6 +124,7 @@ def load() -> Config:
         other_comfys=_list("SV_OTHER_COMFYS"),
         # other ComfyUIs on the machine may be asked to unload idle models before a big job
         free_others=os.environ.get("SV_FREE_OTHERS", "1") == "1",
+        models=models,
         loras=_p("SV_LORAS", models / "comfyui" / "loras"),
         analysis_image=os.environ.get("SV_ANALYSIS_IMAGE", "sv-analysis:latest"),
         analysis_worker=_p("SV_ANALYSIS_WORKER", ROOT / "infra" / "legion" / "analysis" / "worker"),
