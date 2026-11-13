@@ -39,7 +39,7 @@ from .music import eleven, yue2
 from .music.takes import run_other_take, run_yue2_take
 from . import covers as covers_mod, influence_engine, songs
 from . import addons as addons_mod, imports as imports_mod
-from . import brand as brand_mod, library as library_mod, look as look_mod, share as share_mod
+from . import brand as brand_mod, cast as cast_mod, library as library_mod, look as look_mod, share as share_mod
 from .video import finish as finish_mod
 from .video import kinetic as kinetic_mod
 from .video import living as living_mod
@@ -88,6 +88,8 @@ kinetic = kinetic_mod.register(sched, APP, writers)
 music = music_mod.register(sched, APP, writers)
 brand = brand_mod.Brand(APP)
 APP.brand = brand
+cast = cast_mod.Cast(APP)
+APP.cast = cast
 library = library_mod.Library(APP)
 APP.library = library
 share = share_mod.register(sched, APP)
@@ -1085,6 +1087,8 @@ class MusicIn(BaseModel):
     part: dict | None = None  # {start, end, label}: a part of the song, made on its own first
     model: str | None = None
     effort: str | None = None
+    cast: list[str] = []  # characters from Library → Cast
+    castFrom: dict | None = None  # or the cast of an earlier music video: {projectId, filmId}
 
 
 @app.post("/api/projects/{pid}/music")
@@ -1093,7 +1097,8 @@ async def music_start(pid: str, body: MusicIn) -> dict:
     if body.effort and body.effort not in ("low", "medium", "high", "xhigh", "max"):
         raise _err(422, "Choose a reasoning level: low, medium, high, xhigh or max.")
     try:
-        return music.start(pid, body.request, body.feel, body.kind, body.opening, body.model, body.effort, body.part)
+        return music.start(pid, body.request, body.feel, body.kind, body.opening, body.model, body.effort, body.part,
+                           body.cast, body.castFrom)
     except JobError as exc:
         raise _err(409, exc.message) from None
 
@@ -1192,6 +1197,112 @@ async def remove_logo(lid: str) -> dict:
 async def logo_file(lid: str):
     try:
         return FileResponse(brand.logo_file(lid), headers={"Cache-Control": "private, max-age=3600"})
+    except JobError as exc:
+        raise _err(404, exc.message) from None
+
+
+# ---- Cast: your own characters, saved once and used in any lip-synced music video -------------------------
+
+async def _pictures(files: list[UploadFile]) -> list[bytes]:
+    out = []
+    for f in files:
+        data = await f.read(20_000_001)
+        if len(data) > 20_000_000:
+            raise _err(413, f"{f.filename or 'A picture'} is over 20 MB.")
+        out.append(data)
+    return out
+
+
+@app.get("/api/cast")
+async def cast_list() -> dict:
+    return await asyncio.to_thread(cast.list)
+
+
+@app.post("/api/cast")
+async def cast_add(files: list[UploadFile] = File(...), name: str = Form(...), about: str = Form(""),
+                   who: str = Form(...), confirmed: bool = Form(False)) -> dict:
+    """A character from one to four pictures. `confirmed`: the box saying who's in them (invented, you, or someone who
+    agreed to appear in AI-made videos) is ticked; nothing is kept without it."""
+    try:
+        return await asyncio.to_thread(cast.add, name, about, who, confirmed, await _pictures(files))
+    except JobError as exc:
+        raise _err(422, exc.message) from None
+
+
+class CastEdit(BaseModel):
+    name: str | None = None
+    about: str | None = None
+
+
+@app.patch("/api/cast/{cid}")
+async def cast_edit(cid: str, body: CastEdit) -> dict:
+    try:
+        return cast.edit(cid, body.name, body.about)
+    except JobError as exc:
+        raise _err(404, exc.message) from None
+
+
+@app.post("/api/cast/{cid}/pictures")
+async def cast_more(cid: str, files: list[UploadFile] = File(...)) -> dict:
+    try:
+        return await asyncio.to_thread(cast.add_pictures, cid, await _pictures(files))
+    except JobError as exc:
+        raise _err(422, exc.message) from None
+
+
+@app.post("/api/cast/{cid}/main/{name}")
+async def cast_main(cid: str, name: str) -> dict:
+    try:
+        return cast.main_picture(cid, name)
+    except JobError as exc:
+        raise _err(404, exc.message) from None
+
+
+@app.delete("/api/cast/{cid}/pictures/{name}")
+async def cast_less(cid: str, name: str) -> dict:
+    try:
+        return cast.remove_picture(cid, name)
+    except JobError as exc:
+        raise _err(422, exc.message) from None
+
+
+@app.delete("/api/cast/{cid}")
+async def cast_remove(cid: str) -> dict:
+    try:
+        return cast.remove(cid)
+    except JobError as exc:
+        raise _err(404, exc.message) from None
+
+
+@app.get("/api/cast/videos")
+async def cast_videos() -> list[dict]:
+    """Earlier music videos with characters, to use their cast again or save it to the Cast."""
+    return await asyncio.to_thread(cast.videos)
+
+
+class CastFromVideo(BaseModel):
+    projectId: str
+    filmId: str
+    key: str
+    name: str = ""
+    about: str | None = None
+    who: str = ""
+    confirmed: bool = False
+
+
+@app.post("/api/cast/from-video")
+async def cast_from_video(body: CastFromVideo) -> dict:
+    try:
+        return await asyncio.to_thread(cast.from_video, body.projectId, body.filmId, body.key, body.name, body.about,
+                                       body.who, body.confirmed)
+    except JobError as exc:
+        raise _err(422, exc.message) from None
+
+
+@app.get("/api/cast/{cid}/{name}")
+async def cast_file(cid: str, name: str):
+    try:
+        return FileResponse(cast.file(cid, name), headers={"Cache-Control": "private, max-age=3600"})
     except JobError as exc:
         raise _err(404, exc.message) from None
 

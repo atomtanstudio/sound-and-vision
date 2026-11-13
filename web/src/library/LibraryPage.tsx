@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api, ApiError, fileUrl } from "../lib/api";
-import { go } from "../lib/router";
+import { go, usePath } from "../lib/router";
 import { BringSong } from "../shell/BringSong";
 import { Button, Segmented } from "../ui/controls";
+import { CastPanel } from "./CastPanel";
 import { ThumbMaker } from "./ThumbMaker";
 import "../shell/home.css";
 import "../song/music-index.css";
@@ -61,6 +62,9 @@ const many = (n: number, one: string, more = `${one}s`) => `${n} ${n === 1 ? one
  *  Select: drag a box across the covers (⌘-click adds or takes away one) and act on them all from the bar below.
  *  Deleting puts things in the Trash, where they keep everything until they're restored. */
 export function LibraryPage() {
+  const castOpen = usePath().startsWith("/library/cast");  // Library → Cast: your characters, in place of the shelves
+  const [castN, setCastN] = useState(0);
+  useEffect(() => { void api.get<{ members: unknown[] }>("/api/cast").then((c) => setCastN(c.members.length)).catch(() => undefined); }, []);
   const [lib, setLib] = useState<Lib | null>(null);
   const [trash, setTrash] = useState<Item[] | null>(null);
   const [folder, setFolder] = useState<string>(() => remember("sv.lib.folder", "all"));
@@ -78,7 +82,8 @@ export function LibraryPage() {
   const [over, setOver] = useState<string | null>(null);
   const grid = useRef<HTMLDivElement>(null);
   const drawn = useRef(false);  // a box was just drawn: the click that ends it isn't a click on a tile
-  const inTrash = folder === "trash";
+  const inTrash = !castOpen && folder === "trash";
+  const open = (id: string) => { setFolder(id); if (castOpen) go("/library"); };
   const choosing = selecting || inTrash;
 
   const load = useCallback(() => api.get<Lib>("/api/library").then(setLib).catch((e) => setError(String(e.message ?? e))), []);
@@ -282,14 +287,14 @@ export function LibraryPage() {
       <aside className="lib-side" aria-label="Folders">
         <h1>Library</h1>
         <nav className="lib-folders">
-          <FolderRow icon="all" name="Everything" n={lib?.items.length ?? 0} on={folder === "all"} over={over === "all"} onOpen={() => setFolder("all")}
+          <FolderRow icon="all" name="Everything" n={lib?.items.length ?? 0} on={!castOpen && folder === "all"} over={over === "all"} onOpen={() => open("all")}
             {...dropProps(null, "all")} />
-          <FolderRow icon="loose" name="Not in a folder" n={count("none")} on={folder === "none"} over={over === "none"} onOpen={() => setFolder("none")}
+          <FolderRow icon="loose" name="Not in a folder" n={count("none")} on={!castOpen && folder === "none"} over={over === "none"} onOpen={() => open("none")}
             {...dropProps(null, "none")} />
           {folders.length > 0 && <span className="lib-folders-h">Your folders</span>}
           {folders.map((f) => (
-            <FolderRow key={f.id} icon="folder" name={f.name} n={count(f.id)} on={folder === f.id} over={over === f.id} mine
-              onOpen={() => setFolder(f.id)} {...dropProps(f.id, f.id)}
+            <FolderRow key={f.id} icon="folder" name={f.name} n={count(f.id)} on={!castOpen && folder === f.id} over={over === f.id} mine
+              onOpen={() => open(f.id)} {...dropProps(f.id, f.id)}
               onRename={(name) => act(() => api.patch(`/api/library/folders/${f.id}`, { name }))}
               onRemove={() => {
                 if (confirm(`Delete the folder “${f.name}”? What's in it stays in your Library.`)) {
@@ -300,12 +305,15 @@ export function LibraryPage() {
           ))}
           <NewFolder onMake={(name) => void act(() => api.post("/api/library/folders", { name }))} />
           <span className="lib-folders-gap" />
-          <FolderRow icon="trash" name="Trash" n={lib?.trash ?? 0} on={inTrash} over={over === "trash"} onOpen={() => setFolder("trash")}
+          <FolderRow icon="cast" name="Cast" n={castN} on={castOpen} over={false} onOpen={() => go("/library/cast")} />
+          <FolderRow icon="trash" name="Trash" n={lib?.trash ?? 0} on={inTrash} over={over === "trash"} onOpen={() => open("trash")}
             {...dropProps(null, "trash")} />
         </nav>
-        <p className="lib-tip">Drag songs and videos onto a folder to file them, or press Select to work on many at once.</p>
+        <p className="lib-tip">{castOpen ? "Your characters keep their faces from one music video to the next."
+          : "Drag songs and videos onto a folder to file them, or press Select to work on many at once."}</p>
       </aside>
 
+      {castOpen ? <CastPanel onCount={setCastN} /> : (
       <section className={"lib-main" + (choosing ? " choosing" : "")} onPointerDown={startBox}>
         <header className="lib-head">
           <div>
@@ -353,9 +361,10 @@ export function LibraryPage() {
           )}
         </div>
       </section>
+      )}
 
       {box && createPortal(<div className="lib-box" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />, document.body)}
-      {(choosing && (selecting || picked.size > 0)) || undo ? (
+      {!castOpen && ((choosing && (selecting || picked.size > 0)) || undo) ? (
         <SelectionBar chosen={chosen} total={items.length} folders={folders} folder={folder} inTrash={inTrash} undo={undo} selecting={selecting}
           onMove={(to) => void move([...picked], to)} onNewFolder={(name) => void newFolderWith(name, [...picked])}
           onTrash={() => void toTrash([...picked])} onRestore={() => void restore(picked.size ? [...picked] : undo?.keys ?? [])}
@@ -455,6 +464,7 @@ const ICONS: Record<string, React.ReactNode> = {
   loose: <><rect x="3.5" y="3.5" width="5" height="5" rx="1" /><rect x="11.5" y="3.5" width="5" height="5" rx="1" /><rect x="3.5" y="11.5" width="5" height="5" rx="1" /></>,
   folder: <path d="M3 6.2c0-.9.7-1.6 1.6-1.6h3.3l1.6 1.8h5.9c.9 0 1.6.7 1.6 1.6v6.4c0 .9-.7 1.6-1.6 1.6H4.6c-.9 0-1.6-.7-1.6-1.6Z" />,
   trash: <path d="M4 6h12M8 6V4.5h4V6M5.5 6l.8 9.5h7.4l.8-9.5M8.5 8.5v4.5M11.5 8.5v4.5" />,
+  cast: <><circle cx="10" cy="7" r="3" /><path d="M4.5 16c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6" /></>,
 };
 
 function FolderRow({ icon, name, n, on, over, mine, onOpen, onRename, onRemove, ...drop }: {
