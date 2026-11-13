@@ -145,9 +145,11 @@ scripts/models.sh video            # Living Album Covers and music videos (41 GB
 ```
 
 The other sets are `ace` and `music3` (two more song models), `whisper` (hears the words of songs you upload without
-lyrics) and `all`. Each file is checked against its published checksum. An interrupted download carries on where it
-stopped when you run the command again. Each model has its own licence; see [Licences](#licences). MiniMax H3's
-licence doesn't cover use in the US, the EU, the UK or Korea.
+lyrics) and `all`. Each file is checked against its published checksum. A dropped or stalled connection doesn't stop
+a download: it carries on by itself, and if it does stop, running the command again carries on from there. A file
+that's there but cut short (a download that stopped some other way) is fetched again from where it stops, and
+`scripts/models.sh --verify SET` also re-checks the checksum of files already in place. Each model has its own
+licence; see [Licences](#licences). MiniMax H3's licence doesn't cover use in the US, the EU, the UK or Korea.
 
 ### 5. Connect a language model
 
@@ -305,7 +307,9 @@ The service runs with systemd's default `PATH`. If Docker, ffmpeg or a CLI lives
 
 The app runs without any model; each feature needs its own. `scripts/models.sh` downloads them by set (see
 [step 4](#4-download-the-models)), checks each against its published SHA-256 and puts it in place;
-`scripts/install.sh --check` lists what's missing. Model files go in `models/comfyui/<folder>/` (or
+`scripts/install.sh --check` lists what's missing or cut short. The list of files, with their sizes and checksums, is
+`scripts/models.txt`; before a job, the app checks that each file it's about to load is its full size, and stops with
+a plain message if one is cut short rather than letting ComfyUI load it. Model files go in `models/comfyui/<folder>/` (or
 `$SV_MODELS/comfyui/`). To fetch one by hand, a file's address on Hugging Face is
 `https://huggingface.co/<repository>/resolve/main/<path in the repository>`. Each model has its own licence (see
 [Licences](#licences)).
@@ -335,7 +339,8 @@ Two more, outside `models/comfyui/`:
 - **Hearing the words of your own songs** (an upload that came without lyrics): Whisper large-v3,
   `Systran/faster-whisper-large-v3`, about 3 GB, kept as a Hugging Face cache folder (`scripts/models.sh whisper`).
 - **Stems and word timing**: MelBand RoFormer, htdemucs_6s and wav2vec2 are fetched into
-  `models/audio-separation/sv/` the first time a song is analysed (about 3 GB).
+  `models/audio-separation/sv/` the first time a song is analysed (about 3 GB). If that download stops, the next
+  analysis carries on from where it got to; a model already there but cut short is checked once and fetched again.
 
 YuE2 needs the instrumental influence for instrumentals; `scripts/install.sh` downloads it (and so does
 `scripts/models.sh songs`). The Video Builder brings its own model list (see below). MiniMax H3's audio VAE

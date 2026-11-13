@@ -23,13 +23,27 @@ INSTR_MODEL = "htdemucs_6s.yaml"
 def separate(song: str, out: str, models: str, emit=lambda **kv: None) -> dict:
     from audio_separator.separator import Separator
 
+    # audio-separator fetches the models the first time; its own downloader could leave a cut-short model in place
+    import safe_download
+    Separator.download_file_if_not_exists = lambda self, url, path: safe_download.ensure(url, path, log=self.logger.warning)
+
+    def load(sep, name):   # sep.load_model, but when no URL has a file that's already here, use the one that's here
+        try:
+            sep.load_model(name)
+        except safe_download.NotThere:
+            safe_download.TRUST_WHAT_IS_HERE = True
+            try:
+                sep.load_model(name)
+            finally:
+                safe_download.TRUST_WHAT_IS_HERE = False
+
     os.makedirs(out, exist_ok=True)
     tmp = os.path.join(out, ".work")
     os.makedirs(tmp, exist_ok=True)
     timings = {}
     t0 = time.time()
     sep = Separator(model_file_dir=models, output_dir=tmp, output_format="FLAC", log_level=30)
-    sep.load_model(VOCALS_MODEL)
+    load(sep, VOCALS_MODEL)
     files = [os.path.join(tmp, f) for f in sep.separate(song)]
     vocals = next(f for f in files if "(vocals)" in f.lower())
     rest = next(f for f in files if f != vocals)
@@ -40,7 +54,7 @@ def separate(song: str, out: str, models: str, emit=lambda **kv: None) -> dict:
 
     t1 = time.time()
     sep = Separator(model_file_dir=models, output_dir=tmp, output_format="FLAC", log_level=30)
-    sep.load_model(INSTR_MODEL)
+    load(sep, INSTR_MODEL)
     for f in sep.separate(os.path.join(out, "instrumental.flac")):
         f = os.path.join(tmp, f)
         name = f.rsplit("(", 1)[-1].split(")", 1)[0].lower()
